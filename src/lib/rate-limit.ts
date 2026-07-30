@@ -15,3 +15,14 @@ export function rateLimit(key: string, limit = 20, windowMs = 60_000): boolean {
   b.count += 1;
   return true;
 }
+
+/**
+ * 토큰을 소비하지 않고 현재 한도 초과 여부만 확인한다.
+ * 로그인처럼 "실패 횟수"만 카운트해야 하는 경우, 사전 검사는 이 함수로 하고
+ * 실패 시에만 rateLimit()으로 토큰을 소비한다.
+ */
+export function isRateLimited(key: string, limit = 20): boolean {
+  const b = buckets.get(key);
+  if (!b || b.resetAt < Date.now()) return false;
+  return b.count >= limit;
+}

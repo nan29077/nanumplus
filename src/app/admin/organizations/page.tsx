@@ -13,15 +13,34 @@ export const dynamic = "force-dynamic";
 export default async function AdminOrganizationsPage() {
   const user = await requireSuperAdmin();
 
-  const orgs = await prisma.organization.findMany({
-    where: { deletedAt: null },
-    orderBy: { createdAt: "desc" },
-    include: {
-      admins: { include: { user: { select: { name: true, email: true } } } },
-      donations: { where: { status: "COMPLETED", deletedAt: null }, select: { amount: true } },
-      _count: { select: { donors: true, campaigns: true } },
-    },
-  });
+  // 후원 합계는 전체 행을 로드하지 않고 groupBy 집계 쿼리로 분리한다.
+  // qrCodeUrl은 data URL이라 용량이 크므로 목록에서는 조회하지 않는다.
+  const [orgs, donationSums] = await Promise.all([
+    prisma.organization.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        smsFullNumber: true,
+        isActive: true,
+        _count: { select: { donors: true, campaigns: true } },
+      },
+    }),
+    prisma.donation.groupBy({
+      by: ["organizationId"],
+      where: { status: "COMPLETED", deletedAt: null },
+      _sum: { amount: true },
+    }),
+  ]);
+
+  const totalByOrg = new Map<string, number>(
+    donationSums
+      .filter((g): g is typeof g & { organizationId: string } => g.organizationId !== null)
+      .map((g) => [g.organizationId, g._sum.amount ?? 0])
+  );
 
   return (
     <AdminLayout userName={user.name}>
@@ -41,7 +60,7 @@ export default async function AdminOrganizationsPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {orgs.map((o) => {
-            const total = o.donations.reduce((s: number, d: { amount: number }) => s + d.amount, 0);
+            const total = totalByOrg.get(o.id) ?? 0;
             return (
               <Link key={o.id} href={`/admin/organizations/${o.id}`}
                 className="group rounded-2xl border border-stone-200 bg-white p-5 shadow-card transition hover:border-brand-300 hover:shadow-lg">

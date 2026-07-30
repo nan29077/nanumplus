@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { parsePageParam } from "@/lib/utils";
 import { fmtKst } from "@/lib/kst-date";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
@@ -12,7 +13,7 @@ const PAGE_SIZE = 100;
 
 export default async function AdminDonorsPage({ searchParams }: { searchParams: { page?: string } }) {
   const user = await requireSuperAdmin();
-  const page = Math.max(1, parseInt(searchParams.page ?? "1", 10));
+  const page = parsePageParam(searchParams.page);
   const skip = (page - 1) * PAGE_SIZE;
 
   const [donors, totalCount] = await Promise.all([

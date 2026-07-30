@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "./auth";
+import { prisma } from "./prisma";
 
 export type SessionUser = {
   id: string;
@@ -23,12 +24,23 @@ export async function requireSuperAdmin(): Promise<SessionUser> {
   return user;
 }
 
+/** 소속 기관이 살아있고 운영 중인지 확인 */
+async function isOrgUsable(organizationId: string): Promise<boolean> {
+  const org = await prisma.organization.findFirst({
+    where: { id: organizationId, deletedAt: null, isActive: true },
+    select: { id: true },
+  });
+  return org !== null;
+}
+
 /** 페이지용: 기관 관리자 강제 — 본인 organizationId 반환 */
 export async function requireOrgAdmin(): Promise<SessionUser & { organizationId: string }> {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role === "SUPER_ADMIN") redirect("/admin/dashboard");
   if (!user.organizationId) redirect("/login");
+  // 삭제·비활성화된 기관의 관리자는 접근 차단
+  if (!(await isOrgUsable(user.organizationId))) redirect("/login?error=org_inactive");
   return user as SessionUser & { organizationId: string };
 }
 
@@ -46,8 +58,16 @@ export async function apiAuth(
   if (required === "ORG_ADMIN" && user.role === "SUPER_ADMIN") {
     return { error: Response.json({ error: "기관 관리자 전용 API입니다." }, { status: 403 }) };
   }
-  if (required === "ORG_ADMIN" && user.role === "ORG_ADMIN" && !user.organizationId) {
-    return { error: Response.json({ error: "소속 기관이 없습니다." }, { status: 403 }) };
+  if (required === "ORG_ADMIN" && user.role === "ORG_ADMIN") {
+    if (!user.organizationId) {
+      return { error: Response.json({ error: "소속 기관이 없습니다." }, { status: 403 }) };
+    }
+    // 삭제·비활성화된 기관의 관리자는 API 접근도 차단
+    if (!(await isOrgUsable(user.organizationId))) {
+      return {
+        error: Response.json({ error: "소속 기관이 비활성화되었습니다." }, { status: 403 }),
+      };
+    }
   }
   return { user };
 }

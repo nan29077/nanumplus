@@ -46,8 +46,15 @@ BEGIN
       ems_total     NUMERIC(1),
       ems_seq       NUMERIC(1),
       emma_id       CHAR(2)      NOT NULL DEFAULT ''  '',
+      -- 나눔플러스가 상태를 변경할 때마다 갱신. ''처리중''(2) 고착 건 복구에 사용.
+      updated_at    TIMESTAMP    NOT NULL DEFAULT now(),
       CONSTRAINT pk_%I PRIMARY KEY (mo_key)
     )', mo_table, mo_table);
+
+  -- 기존 테이블에도 updated_at 컬럼 보강 (멱등)
+  EXECUTE format('
+    ALTER TABLE %I ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT now()',
+    mo_table);
 
   -- MO 처리 상태 인덱스 (폴링 최적화)
   EXECUTE format('

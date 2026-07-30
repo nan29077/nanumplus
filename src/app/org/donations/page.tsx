@@ -1,5 +1,6 @@
 import { requireOrgAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { parsePageParam } from "@/lib/utils";
 import type { Prisma } from "@prisma/client";
 import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
@@ -13,7 +14,7 @@ export default async function OrgDonationsPage({
   searchParams,
 }: { searchParams: { channel?: string; status?: string; page?: string } }) {
   const user = await requireOrgAdmin();
-  const page = Math.max(1, Number(searchParams.page ?? 1));
+  const page = parsePageParam(searchParams.page);
   const take = 20;
 
   const where: Prisma.DonationWhereInput = {

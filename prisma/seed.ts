@@ -171,16 +171,20 @@ async function main() {
       create: { userId: adminUser.id, organizationId: org.id },
     });
 
-    // SMS 번호 upsert (fullNumber 고유)
-    await prisma.smsNumberAssignment.upsert({
-      where: { fullNumber: `#2540-${def.smsCode}` },
-      update: {},
-      create: {
-        organizationId: org.id, baseNumber: "#2540",
-        code: def.smsCode, fullNumber: `#2540-${def.smsCode}`,
-        assignedById: superAdmin.id,
-      },
+    // SMS 번호 배정 — fullNumber는 이력 테이블이라 고유하지 않으므로
+    // 현재 유효한(isActive) 배정이 없을 때만 생성한다.
+    const existingAssignment = await prisma.smsNumberAssignment.findFirst({
+      where: { fullNumber: `#2540-${def.smsCode}`, isActive: true },
     });
+    if (!existingAssignment) {
+      await prisma.smsNumberAssignment.create({
+        data: {
+          organizationId: org.id, baseNumber: "#2540",
+          code: def.smsCode, fullNumber: `#2540-${def.smsCode}`,
+          assignedById: superAdmin.id,
+        },
+      });
+    }
 
     // QR 코드 - 고유 제약 없음 → 없을 때만 생성
     const existingQr = await prisma.qrCode.findFirst({ where: { organizationId: org.id } });

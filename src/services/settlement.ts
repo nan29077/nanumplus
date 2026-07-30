@@ -71,6 +71,8 @@ export async function generateSettlements(organizationId?: string) {
       status: "COMPLETED",
       deletedAt: null,
       settlementItems: { none: {} },
+      // 기관 미배정(organizationId=null) 후원은 정산 대상에서 제외
+      organizationId: { not: null },
       ...(organizationId ? { organizationId } : {}),
     },
     include: {
@@ -103,13 +105,16 @@ export async function generateSettlements(organizationId?: string) {
   >();
 
   for (const d of donations) {
+    // where 절에서 organizationId: { not: null } 로 걸러지지만 타입 안전을 위해 재확인
+    if (!d.organizationId) continue;
+
     const settled = calcSettlementDate(d.channel, d.donatedAt);
     const period = settlementPeriod(settled);
     const key: GroupKey = `${d.organizationId}::${period}`;
 
     if (!groups.has(key)) {
       groups.set(key, {
-        organizationId: d.organizationId!,
+        organizationId: d.organizationId,
         period,
         scheduledDate: settled,
         items: [],
@@ -119,7 +124,7 @@ export async function generateSettlements(organizationId?: string) {
       });
     }
 
-    const feePercent = getFeePercent(feeMap, d.organizationId ?? "", d.channel);
+    const feePercent = getFeePercent(feeMap, d.organizationId, d.channel);
     const donationFee = Math.round(d.amount * feePercent / 100);
 
     groups.get(key)!.items.push({
@@ -168,25 +173,43 @@ export async function generateSettlements(organizationId?: string) {
       void s;
       created++;
     } else {
-      // 기존 정산에 새 항목 추가
-      await prisma.settlementItem.createMany({
-        data: g.items.map((i) => ({
-          settlementId: existing.id,
-          donationId: i.donationId,
-          amount: i.amount,
-          channel: i.channel,
-          donatedAt: i.donatedAt,
-        })),
-        skipDuplicates: true,
+      // 기존 정산에 새 항목 추가.
+      // 이미 정산 항목이 존재하는 후원 건은 사전에 제외하고,
+      // 실제로 추가되는 항목만으로 금액을 재계산한다.
+      const linked = await prisma.settlementItem.findMany({
+        where: { donationId: { in: g.items.map((i) => i.donationId) } },
+        select: { donationId: true },
       });
-      await prisma.settlement.update({
-        where: { id: existing.id },
-        data: {
-          totalAmount: existing.totalAmount + total,
-          feeAmount: existing.feeAmount + fee,
-          netAmount: existing.netAmount + net,
-        },
-      });
+      const linkedIds = new Set(linked.map((i) => i.donationId));
+      const newItems = g.items.filter((i) => !linkedIds.has(i.donationId));
+      if (newItems.length === 0) continue;
+
+      const addTotal = newItems.reduce((s, i) => s + i.amount, 0);
+      const addFee = newItems.reduce((s, i) => s + i.feeAmount, 0);
+      const addNet = addTotal - addFee;
+
+      // 항목 삽입과 금액 갱신을 하나의 트랜잭션으로 원자 처리.
+      // skipDuplicates를 쓰지 않으므로 동시 실행으로 중복이 발생하면
+      // 트랜잭션 전체가 롤백되어 금액 불일치가 생기지 않는다.
+      await prisma.$transaction([
+        prisma.settlementItem.createMany({
+          data: newItems.map((i) => ({
+            settlementId: existing.id,
+            donationId: i.donationId,
+            amount: i.amount,
+            channel: i.channel,
+            donatedAt: i.donatedAt,
+          })),
+        }),
+        prisma.settlement.update({
+          where: { id: existing.id },
+          data: {
+            totalAmount: { increment: addTotal },
+            feeAmount: { increment: addFee },
+            netAmount: { increment: addNet },
+          },
+        }),
+      ]);
       updated++;
     }
   }

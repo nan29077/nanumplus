@@ -26,14 +26,58 @@ import {
 
 /** 미처리 MO 레코드를 조회 (이번 달 + 저번 달 테이블)
  *
- * msg_status IN ('3', '0') 를 조회한다:
- *  - '3' = 우리 시스템 기준 신규
- *  - '0' = Infobank EMMA 버전에 따라 신규를 '0'으로 표기하는 경우 대비
+ * 조회 대상:
+ *  - msg_status = '3' : 우리 시스템 기준 신규
+ *  - msg_status = '0' : Infobank EMMA 버전에 따라 신규를 '0'으로 표기하는 경우 대비
+ *  - msg_status = '2' 이면서 5분 이상 갱신되지 않은 건 :
+ *      '처리중' 상태로 선점된 뒤 프로세스가 중단되어 영구 고착된 건의 복구
  *  중복 처리는 providerTransactionId unique 제약으로 방지한다.
  */
+const MO_STALE_INTERVAL = "5 minutes";
+
+/**
+ * updated_at 컬럼 보유 여부 캐시 (테이블별).
+ * EMMA 기본 스키마에는 updated_at이 없으므로, 우리 쪽에서 컬럼을 추가해
+ * 상태 변경 시각을 기록하고 고착 건 복구에 사용한다.
+ * ALTER 권한이 없는 환경에서도 동작하도록 실패 시 false로 캐시한다.
+ */
+const hasUpdatedAt = new Map<string, boolean>();
+
+async function ensureUpdatedAtColumn(suffix: string): Promise<boolean> {
+  const cached = hasUpdatedAt.get(suffix);
+  if (cached !== undefined) return cached;
+
+  const client = getEmmaClient();
+  const table = `em_mo_log_${suffix}`;
+  try {
+    await client.$executeRawUnsafe(
+      `ALTER TABLE ${table}
+         ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT now()`
+    );
+    hasUpdatedAt.set(suffix, true);
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[emma-mo] ${table} updated_at 컬럼 확보 실패 → 고착 복구 비활성:`, msg);
+    hasUpdatedAt.set(suffix, false);
+    return false;
+  }
+}
+
+/** updated_at 컬럼이 있을 때만 SET 절에 갱신 시각을 추가 */
+function touchClause(suffix: string): string {
+  return hasUpdatedAt.get(suffix) ? ", updated_at = NOW()" : "";
+}
+
 async function fetchUnprocessedMo(suffix: string): Promise<EmmaMoRecord[]> {
   const client = getEmmaClient();
   const table = `em_mo_log_${suffix}`;
+
+  // 고착 건 복구 조건은 updated_at 컬럼이 있을 때만 적용
+  const staleClause = (await ensureUpdatedAtColumn(suffix))
+    ? `OR (msg_status = '${EMMA_MSG_STATUS.PROCESSING}'
+             AND updated_at < NOW() - INTERVAL '${MO_STALE_INTERVAL}')`
+    : "";
 
   try {
     // 테이블이 존재하지 않으면 빈 배열 반환 (EMMA 미설치 환경)
@@ -44,6 +88,7 @@ async function fetchUnprocessedMo(suffix: string): Promise<EmmaMoRecord[]> {
               ems_seq, emma_id
        FROM ${table}
        WHERE msg_status IN ('3', '0')
+          ${staleClause}
        ORDER BY date_mo ASC
        LIMIT 100`
     );
@@ -67,7 +112,7 @@ async function updateMoStatus(
   const client = getEmmaClient();
   const table = `em_mo_log_${suffix}`;
   await client.$queryRawUnsafe(
-    `UPDATE ${table} SET msg_status = $1 WHERE mo_key = $2`,
+    `UPDATE ${table} SET msg_status = $1${touchClause(suffix)} WHERE mo_key = $2`,
     status,
     moKey
   );
@@ -75,17 +120,25 @@ async function updateMoStatus(
 
 /**
  * 상태를 '신규'에서 '처리중'으로 원자적으로 선점한다.
- * WHERE 조건에 이전 상태(IN ('3','0'))를 포함하므로
- * 다른 프로세스가 먼저 변경했을 경우 0건이 업데이트되어 false를 반환한다.
+ * WHERE 조건에 이전 상태를 포함하므로 다른 프로세스가 먼저 변경했을 경우
+ * 0건이 업데이트되어 false를 반환한다.
+ *
+ * 신규('3','0')뿐 아니라 5분 이상 '처리중'('2')으로 남은 고착 건도 선점 대상에 포함해,
+ * 처리 도중 프로세스가 중단된 MO가 영구히 묻히지 않도록 한다.
  */
 async function claimMoForProcessing(suffix: string, moKey: string): Promise<boolean> {
   const client = getEmmaClient();
   const table = `em_mo_log_${suffix}`;
+  const staleClause = hasUpdatedAt.get(suffix)
+    ? `OR (msg_status = '${EMMA_MSG_STATUS.PROCESSING}'
+             AND updated_at < NOW() - INTERVAL '${MO_STALE_INTERVAL}')`
+    : "";
   const result = await client.$queryRawUnsafe<[{ count: bigint }]>(
     `WITH updated AS (
        UPDATE ${table}
-       SET msg_status = $1
-       WHERE mo_key = $2 AND msg_status IN ('3', '0')
+       SET msg_status = $1${touchClause(suffix)}
+       WHERE mo_key = $2
+         AND (msg_status IN ('3', '0') ${staleClause})
        RETURNING 1
      )
      SELECT COUNT(*) AS count FROM updated`,

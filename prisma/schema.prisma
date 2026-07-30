@@ -156,7 +156,11 @@ model SmsNumberAssignment {
   organizationId String
   baseNumber     String    @default("#2540")
   code           String // 4자리
-  fullNumber     String    @unique
+  // 배정 이력 테이블이므로 fullNumber에 전역 unique를 걸지 않는다.
+  // (걸면 번호 회수 후 다른 기관에 재배정할 수 없음)
+  // 현재 유효한 배정의 유일성은 isActive=true 부분 유니크 인덱스 +
+  // 애플리케이션 레벨 사전 검사로 보장한다.
+  fullNumber     String
   assignedById   String?
   isActive       Boolean   @default(true)
   assignedAt     DateTime  @default(now())
@@ -165,6 +169,7 @@ model SmsNumberAssignment {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+  @@index([fullNumber, isActive])
 }
 
 model Donor {

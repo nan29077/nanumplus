@@ -55,18 +55,19 @@ export class InfobankLiveAdapter implements InfobankSmsDonationAdapter {
 
   verifyWebhookSignature(rawBody: string, signature: string | null): boolean {
     const secret = process.env.INFOBANK_WEBHOOK_SECRET;
-    // EMMA는 DB 폴링 방식이므로 웹훅 서명 검증이 필요 없다.
-    // 레거시 웹훅 엔드포인트 호환성 유지를 위해 secret 미설정 시 허용.
-    if (!secret) return true;
+    // EMMA는 DB 폴링 방식이므로 웹훅 서명 검증이 필요 없지만,
+    // 레거시 웹훅 엔드포인트는 시크릿 미설정 시 fail-closed로 거부한다.
+    if (!secret) return false;
     if (!signature) return false;
     const expected = crypto
       .createHmac("sha256", secret)
       .update(rawBody)
       .digest("hex");
-    return crypto.timingSafeEqual(
-      Buffer.from(expected),
-      Buffer.from(signature)
-    );
+    const expectedBuf = Buffer.from(expected);
+    const sigBuf = Buffer.from(signature);
+    // timingSafeEqual은 길이가 다르면 예외를 던지므로 사전에 길이 확인
+    if (sigBuf.length !== expectedBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, sigBuf);
   }
 
   async sendMt(req: SmsMtRequest): Promise<ProviderResult<SmsMtResult>> {

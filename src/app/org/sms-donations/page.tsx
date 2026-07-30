@@ -1,5 +1,6 @@
 import { requireOrgAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { parsePageParam } from "@/lib/utils";
 import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { Pagination } from "@/components/donation/filter-bar";
@@ -14,7 +15,7 @@ export default async function Page({
   searchParams,
 }: { searchParams: { status?: string; page?: string } }) {
   const user = await requireOrgAdmin();
-  const page = Math.max(1, Number(searchParams.page ?? 1));
+  const page = parsePageParam(searchParams.page);
   const take = 18;
 
   const where = {

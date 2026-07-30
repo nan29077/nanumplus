@@ -211,11 +211,22 @@ async function main() {
       });
 
       if (smsCode && smsFullNumber) {
-        await prisma.smsNumberAssignment.upsert({
-          where: { fullNumber: smsFullNumber },
-          update: { organizationId: createdOrg.id, code: smsCode, isActive: true },
-          create: { organizationId: createdOrg.id, baseNumber: "#2540", code: smsCode, fullNumber: smsFullNumber, isActive: true },
+        // fullNumber는 이력 테이블이라 고유하지 않으므로
+        // 현재 유효한(isActive) 배정을 찾아 갱신하고, 없으면 새로 만든다.
+        const current = await prisma.smsNumberAssignment.findFirst({
+          where: { fullNumber: smsFullNumber, isActive: true },
+          select: { id: true },
         });
+        if (current) {
+          await prisma.smsNumberAssignment.update({
+            where: { id: current.id },
+            data: { organizationId: createdOrg.id, code: smsCode, isActive: true },
+          });
+        } else {
+          await prisma.smsNumberAssignment.create({
+            data: { organizationId: createdOrg.id, baseNumber: "#2540", code: smsCode, fullNumber: smsFullNumber, isActive: true },
+          });
+        }
       }
 
       console.log("ok: " + org.name + " (" + slug + ") " + (smsFullNumber ?? "EMMA없음"));

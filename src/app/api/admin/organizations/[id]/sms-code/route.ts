@@ -38,9 +38,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (dup) {
     return Response.json({ error: `Already assigned to ${dup.name}` }, { status: 409 });
   }
-  const assignDup = await prisma.smsNumberAssignment.findUnique({ where: { fullNumber } });
+  // 이력 전체가 아니라 "현재 유효한(isActive) 배정"만 중복으로 판단한다.
+  // → 회수된 번호는 다른 기관에 재배정 가능.
+  const assignDup = await prisma.smsNumberAssignment.findFirst({
+    where: { fullNumber, isActive: true },
+  });
   if (assignDup && assignDup.organizationId !== org.id) {
-    return Response.json({ error: "Number already assigned" }, { status: 409 });
+    return Response.json({ error: "이미 배정된 번호입니다." }, { status: 409 });
   }
 
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {

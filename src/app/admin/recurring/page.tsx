@@ -1,5 +1,6 @@
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { parsePageParam } from "@/lib/utils";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { DonationTable } from "@/components/donation/donation-table";
@@ -12,7 +13,7 @@ export default async function Page({
   searchParams,
 }: { searchParams: { orgId?: string; status?: string; page?: string } }) {
   const user = await requireSuperAdmin();
-  const page = Math.max(1, Number(searchParams.page ?? 1));
+  const page = parsePageParam(searchParams.page);
   const take = 20;
 
   const where = {

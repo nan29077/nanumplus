@@ -52,9 +52,13 @@ export class OnkiMockAdapter implements OnkiTransferAdapter {
 
   verifyWebhookSignature(rawBody: string, signature: string | null): boolean {
     const secret = process.env.ONKI_WEBHOOK_SECRET;
-    if (!secret) return true;
+    if (!secret) return false; // fail-closed: 시크릿 미설정 시 검증 불가 → 거부
     if (!signature) return false;
     const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+    const expectedBuf = Buffer.from(expected);
+    const sigBuf = Buffer.from(signature);
+    // timingSafeEqual은 길이가 다르면 예외를 던지므로 사전에 길이 확인
+    if (sigBuf.length !== expectedBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, sigBuf);
   }
 }
