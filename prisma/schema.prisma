@@ -1,0 +1,384 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Enums ─────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  ORG_ADMIN
+}
+
+enum DonationChannel {
+  SMS
+  EASY_TRANSFER
+  RECURRING_TRANSFER
+}
+
+enum DonationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  ENDED
+  CLOSED
+}
+
+enum SettlementStatus {
+  PENDING     // 정산 대기
+  PROCESSING  // 처리 중
+  COMPLETED   // 정산 완료
+  CANCELLED   // 취소
+}
+
+// ───────────────────────── Models ─────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String
+  passwordHash   String?
+  role           UserRole  @default(ORG_ADMIN)
+  isActive       Boolean   @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organizationAdmin OrganizationAdmin?
+  auditLogs         AuditLog[]
+  accounts          Account[]
+  sessions          Session[]
+}
+
+model Organization {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  logoUrl       String?
+  description   String?
+  address       String?
+  phone         String?
+  email         String?
+  smsBaseNumber String    @default("#2540")
+  smsCode       String?   @unique // 4자리 숫자
+  smsFullNumber String?   @unique // 예: #2540-1234 (대시 포함)
+  qrCodeUrl     String?
+  // 정산 계좌 정보
+  bankName      String?   // 은행명 (예: 국민은행)
+  bankAccount   String?   // 계좌번호
+  bankHolder    String?   // 예금주
+  isActive      Boolean   @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  admins             OrganizationAdmin[]
+  smsAssignments     SmsNumberAssignment[]
+  donors             Donor[]
+  donations          Donation[]
+  recurringDonations RecurringDonation[]
+  campaigns          Campaign[]
+  qrCodes            QrCode[]
+  settlements        Settlement[]
+  fees               OrganizationFee[]
+}
+
+model OrganizationAdmin {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model SmsNumberAssignment {
+  id             String    @id @default(cuid())
+  organizationId String
+  baseNumber     String    @default("#2540")
+  code           String // 4자리
+  fullNumber     String    @unique
+  assignedById   String?
+  isActive       Boolean   @default(true)
+  assignedAt     DateTime  @default(now())
+  revokedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model Donor {
+  id              String    @id @default(cuid())
+  organizationId  String
+  name            String
+  phone           String?
+  email           String?
+  memo            String?
+  privacyConsent  Boolean   @default(false)
+  isRecurring     Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  donations          Donation[]
+  recurringDonations RecurringDonation[]
+
+  @@index([organizationId])
+  @@index([organizationId, phone])
+}
+
+model Donation {
+  id                    String          @id @default(cuid())
+  organizationId        String?          // null = 기관 미매핑 SMS (기관배정 없음)
+  donorId               String?
+  campaignId            String?
+  channel               DonationChannel
+  amount                Int // KRW (SMS는 항상 3000)
+  status                DonationStatus  @default(PENDING)
+  donatedAt             DateTime        @default(now())
+  providerTransactionId String?         @unique
+  providerName          String? // infobank | onki
+  memo                  String?
+  smsBody               String?         // 후원자가 보낸 문자 내용 (SMS 채널 전용)
+  senderPhone           String?         // 발신자 전화번호 (SMS 채널 전용)
+  recipientNumber       String?         // 수신 번호 원본 (기관 미배정 SMS용)
+  deletedAt             DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  organization    Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  donor           Donor?           @relation(fields: [donorId], references: [id], onDelete: SetNull)
+  campaign        Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  settlementItems SettlementItem[]
+
+  @@index([organizationId, donatedAt])
+  @@index([organizationId, channel])
+  @@index([campaignId])
+  @@index([channel, status, donatedAt])   // 채널별 관리자 조회 최적화
+  @@index([status, donatedAt])            // 상태별 필터링 최적화
+  @@index([deletedAt, donatedAt])         // deletedAt IS NULL 쿼리 최적화
+}
+
+model RecurringDonation {
+  id                 String          @id @default(cuid())
+  organizationId     String
+  donorId            String
+  amount             Int
+  dayOfMonth         Int             @default(25)
+  status             RecurringStatus @default(ACTIVE)
+  providerContractId String?         @unique
+  startedAt          DateTime        @default(now())
+  cancelledAt        DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  donor        Donor        @relation(fields: [donorId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model Campaign {
+  id              String         @id @default(cuid())
+  organizationId  String
+  title           String
+  slug            String         @unique
+  coverImageUrl   String?
+  goalAmount      Int
+  currentAmount   Int            @default(0)
+  startDate       DateTime
+  endDate         DateTime
+  summary         String?
+  story           String?
+  reason          String?
+  usagePlan       String?
+  beneficiary     String?
+  messageToDonors  String?
+  allowedChannels  String?        @db.Text // JSON: ["SMS","EASY_TRANSFER","RECURRING_TRANSFER"]
+  status           CampaignStatus @default(DRAFT)
+  isPublished      Boolean        @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  images       CampaignImage[]
+  donations    Donation[]
+
+  @@index([organizationId])
+}
+
+model CampaignImage {
+  id         String   @id @default(cuid())
+  campaignId String
+  url        String
+  caption    String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+}
+
+model QrCode {
+  id             String    @id @default(cuid())
+  organizationId String
+  targetUrl      String
+  imageDataUrl   String // data:image/png;base64
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  revokedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String // infobank | onki
+  eventType   String
+  payload     Json
+  processed   Boolean   @default(false)
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([provider, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String // 예: ORGANIZATION_CREATE
+  entityType String?
+  entityId   String?
+  detail     Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId])
+}
+
+// ───────────────────────── 정산 ─────────────────────────
+
+model Settlement {
+  id             String           @id @default(cuid())
+  organizationId String
+  period         String           // "2026-04" (YYYY-MM) 정산 월
+  scheduledDate  DateTime         // 정산 예정일 (해당 월 16일)
+  totalAmount    Int              @default(0) // 총 후원금액
+  feeAmount      Int              @default(0) // 수수료
+  netAmount      Int              @default(0) // 실지급액 (totalAmount - feeAmount)
+  status         SettlementStatus @default(PENDING)
+  processedAt    DateTime?        // 처리 완료 일시
+  bankName       String?          // 처리 시점 계좌 스냅샷
+  bankAccount    String?
+  bankHolder     String?
+  note           String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items        SettlementItem[]
+
+  @@unique([organizationId, period])
+  @@index([organizationId])
+  @@index([scheduledDate])
+  @@index([status])
+}
+
+// 기관별 후원 채널 수수료 설정
+model OrganizationFee {
+  id             String          @id @default(cuid())
+  organizationId String
+  channel        DonationChannel
+  feePercent     Float           @default(5.0) // 수수료율 (%)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, channel])
+  @@index([organizationId])
+}
+
+model SettlementItem {
+  id           String   @id @default(cuid())
+  settlementId String
+  donationId   String   @unique
+  amount       Int
+  channel      String
+  donatedAt    DateTime
+  createdAt    DateTime @default(now())
+
+  settlement Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  donation   Donation   @relation(fields: [donationId], references: [id], onDelete: Cascade)
+
+  @@index([settlementId])
+}

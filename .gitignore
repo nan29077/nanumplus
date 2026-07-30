@@ -1,0 +1,38 @@
+# 의존성
+node_modules
+
+# 빌드 산출물
+.next
+out
+build
+*.tsbuildinfo
+next-env.d.ts
+
+# 환경 변수 (시크릿 포함)
+.env
+.env.local
+.env.*.local
+
+# 로그
+logs/*
+!logs/.gitkeep
+*.log
+npm-debug.log*
+
+# EMMA (인포뱅크 온프레미스 에이전트) — 용량이 크고 원격 저장소 대상 아님
+EMMA3/
+EMMA_installer.exe
+
+# 인증서 · 개인키 (보안상 GitHub에 올리지 않음)
+cert/nanum_pri.der
+cert/*.der
+cert/*.key
+cert/*.pem
+cert/*.p12
+cert/*.pfx
+
+# OS / 에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

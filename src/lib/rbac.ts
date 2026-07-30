@@ -1,0 +1,61 @@
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { authOptions } from "./auth";
+
+export type SessionUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: "SUPER_ADMIN" | "ORG_ADMIN";
+  organizationId: string | null;
+};
+
+export async function getSessionUser(): Promise<SessionUser | null> {
+  const session = await getServerSession(authOptions);
+  return (session?.user as SessionUser) ?? null;
+}
+
+/** 페이지용: 최고 관리자 강제 */
+export async function requireSuperAdmin(): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  if (user.role !== "SUPER_ADMIN") redirect("/org/dashboard");
+  return user;
+}
+
+/** 페이지용: 기관 관리자 강제 — 본인 organizationId 반환 */
+export async function requireOrgAdmin(): Promise<SessionUser & { organizationId: string }> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  if (user.role === "SUPER_ADMIN") redirect("/admin/dashboard");
+  if (!user.organizationId) redirect("/login");
+  return user as SessionUser & { organizationId: string };
+}
+
+/** API용: 401/403 응답 객체 또는 사용자 반환 */
+export async function apiAuth(
+  required: "SUPER_ADMIN" | "ORG_ADMIN"
+): Promise<{ user: SessionUser } | { error: Response }> {
+  const user = await getSessionUser();
+  if (!user) {
+    return { error: Response.json({ error: "로그인이 필요합니다." }, { status: 401 }) };
+  }
+  if (required === "SUPER_ADMIN" && user.role !== "SUPER_ADMIN") {
+    return { error: Response.json({ error: "최고 관리자 권한이 필요합니다." }, { status: 403 }) };
+  }
+  if (required === "ORG_ADMIN" && user.role === "ORG_ADMIN" && !user.organizationId) {
+    return { error: Response.json({ error: "소속 기관이 없습니다." }, { status: 403 }) };
+  }
+  return { user };
+}
+
+/**
+ * 기관 데이터 스코프: 기관 관리자는 항상 본인 organizationId로 제한.
+ * 최고 관리자는 orgId 파라미터(선택)로 필터.
+ */
+export function orgScope(user: SessionUser, requestedOrgId?: string | null) {
+  if (user.role === "SUPER_ADMIN") {
+    return requestedOrgId ? { organizationId: requestedOrgId } : {};
+  }
+  return { organizationId: user.organizationId! };
+}
