@@ -13,6 +13,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { SmsCodeAssign } from "@/components/admin/sms-code-assign";
 import { QRCodeCard } from "@/components/donation/qr-code-card";
 import { OrgFeeClient } from "@/components/admin/org-fee-client";
+import { OrgEditDelete } from "@/components/admin/org-edit-delete";
+import { OrgResetPassword } from "@/components/admin/org-reset-password";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +129,20 @@ export default async function AdminOrganizationDetailPage({ params }: { params: 
       <div className="mt-4">
         <OrgFeeClient orgId={org.id} initialFees={fees} />
       </div>
+
+      <div className="mt-4">
+        <OrgResetPassword orgId={org.id} />
+      </div>
+
+      <OrgEditDelete
+        orgId={org.id}
+        initialName={org.name}
+        initialEmail={org.email ?? null}
+        initialPhone={org.phone ?? null}
+        initialAddress={org.address ?? null}
+        initialDescription={org.description ?? null}
+        initialIsActive={org.isActive}
+      />
     </AdminLayout>
   );
 }

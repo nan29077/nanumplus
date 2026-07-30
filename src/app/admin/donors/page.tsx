@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { fmtKst } from "@/lib/kst-date";
@@ -7,22 +8,30 @@ import { DonorTable, type DonorRow } from "@/components/donation/donor-table";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminDonorsPage() {
-  const user = await requireSuperAdmin();
+const PAGE_SIZE = 100;
 
-  const donors = await prisma.donor.findMany({
-    where: { deletedAt: null },
-    orderBy: { createdAt: "desc" },
-    take: 300,
-    include: {
-      organization: { select: { name: true } },
-      donations: {
-        where: { status: "COMPLETED", deletedAt: null },
-        select: { amount: true, donatedAt: true },
-        orderBy: { donatedAt: "desc" },
+export default async function AdminDonorsPage({ searchParams }: { searchParams: { page?: string } }) {
+  const user = await requireSuperAdmin();
+  const page = Math.max(1, parseInt(searchParams.page ?? "1", 10));
+  const skip = (page - 1) * PAGE_SIZE;
+
+  const [donors, totalCount] = await Promise.all([
+    prisma.donor.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      take: PAGE_SIZE,
+      skip,
+      include: {
+        organization: { select: { name: true } },
+        donations: {
+          where: { status: "COMPLETED", deletedAt: null },
+          select: { amount: true, donatedAt: true },
+          orderBy: { donatedAt: "desc" },
+        },
       },
-    },
-  });
+    }),
+    prisma.donor.count({ where: { deletedAt: null } }),
+  ]);
 
   const rows: DonorRow[] = donors.map((d) => ({
     id: d.id,
@@ -37,10 +46,25 @@ export default async function AdminDonorsPage() {
     createdAt: fmtKst(d.createdAt, "yyyy-MM-dd"),
   }));
 
+  const hasMore = skip + donors.length < totalCount;
+
   return (
     <AdminLayout userName={user.name}>
-      <PageHeader title="후원자" description={`전체 기관의 후원자 ${rows.length.toLocaleString("ko-KR")}명 (개인정보는 마스킹되어 표시됩니다)`} />
+      <PageHeader
+        title="후원자"
+        description={`전체 ${totalCount.toLocaleString("ko-KR")}명 (개인정보는 마스킹되어 표시됩니다)`}
+      />
       <DonorTable donors={rows} showCsv={false} />
+      {hasMore && (
+        <div className="mt-4 flex justify-center">
+          <Link
+            href={`?page=${page + 1}`}
+            className="rounded-xl border border-stone-200 bg-white px-6 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+          >
+            더 보기 ({totalCount - skip - donors.length}명 남음)
+          </Link>
+        </div>
+      )}
     </AdminLayout>
   );
 }

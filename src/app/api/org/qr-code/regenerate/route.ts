@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   const org = await prisma.organization.findUnique({ where: { id: orgId } });
   if (!org) return Response.json({ error: "기관을 찾을 수 없습니다." }, { status: 404 });
 
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "localhost:3001";
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "localhost:3005";
   const proto = req.headers.get("x-forwarded-proto") ?? "http";
   const targetUrl = donatePageUrl(org.slug, `${proto}://${host}`);
   const imageDataUrl = await generateQrDataUrl(targetUrl);

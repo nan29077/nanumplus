@@ -49,8 +49,9 @@ async function main() {
       tables.forEach((t) => console.log(`     - ${t.table_name}`));
     }
 
-    // 2. em_mo_log_202506 상세 조회
-    const suffix = "202506";
+    // 2. 이번 달 em_mo_log 상세 조회
+    const now = new Date();
+    const suffix = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
     const tableName = `em_mo_log_${suffix}`;
     const exists = tables.some((t) => t.table_name === tableName);
 

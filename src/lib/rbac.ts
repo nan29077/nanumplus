@@ -43,6 +43,9 @@ export async function apiAuth(
   if (required === "SUPER_ADMIN" && user.role !== "SUPER_ADMIN") {
     return { error: Response.json({ error: "최고 관리자 권한이 필요합니다." }, { status: 403 }) };
   }
+  if (required === "ORG_ADMIN" && user.role === "SUPER_ADMIN") {
+    return { error: Response.json({ error: "기관 관리자 전용 API입니다." }, { status: 403 }) };
+  }
   if (required === "ORG_ADMIN" && user.role === "ORG_ADMIN" && !user.organizationId) {
     return { error: Response.json({ error: "소속 기관이 없습니다." }, { status: 403 }) };
   }

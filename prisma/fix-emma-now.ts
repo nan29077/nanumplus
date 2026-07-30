@@ -9,7 +9,7 @@
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient({ log: [] });
-const SERVER = "http://localhost:3001";
+const SERVER = "http://localhost:3005";
 
 function fmtKst(d: Date): string {
   return d.toLocaleString("ko-KR", {

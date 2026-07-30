@@ -12,6 +12,9 @@ export default withAuth(
     const { pathname } = req.nextUrl;
     const role = req.nextauth.token?.role as "SUPER_ADMIN" | "ORG_ADMIN" | undefined;
 
+    if (role !== "SUPER_ADMIN" && role !== "ORG_ADMIN") {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
     if (pathname.startsWith("/admin") && role !== "SUPER_ADMIN") {
       return NextResponse.redirect(new URL("/org/dashboard", req.url));
     }

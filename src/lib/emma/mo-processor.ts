@@ -73,6 +73,28 @@ async function updateMoStatus(
   );
 }
 
+/**
+ * 상태를 '신규'에서 '처리중'으로 원자적으로 선점한다.
+ * WHERE 조건에 이전 상태(IN ('3','0'))를 포함하므로
+ * 다른 프로세스가 먼저 변경했을 경우 0건이 업데이트되어 false를 반환한다.
+ */
+async function claimMoForProcessing(suffix: string, moKey: string): Promise<boolean> {
+  const client = getEmmaClient();
+  const table = `em_mo_log_${suffix}`;
+  const result = await client.$queryRawUnsafe<[{ count: bigint }]>(
+    `WITH updated AS (
+       UPDATE ${table}
+       SET msg_status = $1
+       WHERE mo_key = $2 AND msg_status IN ('3', '0')
+       RETURNING 1
+     )
+     SELECT COUNT(*) AS count FROM updated`,
+    EMMA_MSG_STATUS.PROCESSING,
+    moKey
+  );
+  return Number(result[0].count) > 0;
+}
+
 /** mo_originator 번호로 Donor를 찾거나 생성 */
 async function findOrCreateDonor(
   organizationId: string,
@@ -167,13 +189,18 @@ export async function processEmmaMo(): Promise<EmmaMoProcessResult> {
     for (const row of records) {
       const { mo_key, mo_recipient, mo_originator, content, date_mo } = row;
 
-      // 처리 중으로 상태 변경 (중복 실행 방지)
+      // 처리 중으로 상태를 원자적으로 선점 (다른 프로세스가 먼저 변경했으면 0건 → 건너뜀)
+      let claimed = false;
       try {
-        await updateMoStatus(suffix, mo_key, EMMA_MSG_STATUS.PROCESSING);
+        claimed = await claimMoForProcessing(suffix, mo_key);
       } catch {
-        // 이미 다른 프로세스가 변경했을 가능성 — 건너뜀
         result.skipped++;
-        result.details.push({ moKey: mo_key, status: "skipped", reason: "상태 변경 실패 (중복 실행)" });
+        result.details.push({ moKey: mo_key, status: "skipped", reason: "상태 선점 실패 (DB 오류)" });
+        continue;
+      }
+      if (!claimed) {
+        result.skipped++;
+        result.details.push({ moKey: mo_key, status: "skipped", reason: "이미 처리 중인 MO (중복 실행)" });
         continue;
       }
 

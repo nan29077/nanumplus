@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CalendarClock, Users, MessageSquare, Landmark, RefreshCw, ExternalLink } from "lucide-react";
 import { formatKRW } from "@/lib/utils";
 import { StatusBadge, Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { DonationChannel } from "@/lib/campaign-schema";
 import { CHANNEL_LABELS } from "@/lib/campaign-schema";
 
@@ -133,9 +137,15 @@ export function OrgCampaignCard({
   allowedChannels?: string | null;
   slug: string;
 }) {
+  const router = useRouter();
   const pct = Math.min(100, Math.round((currentAmount / Math.max(goalAmount, 1)) * 100));
   const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / 86_400_000));
   const channels = parseChannels(allowedChannels);
+
+  const handleDelete = async () => {
+    const res = await fetch(`/api/org/campaigns/${id}`, { method: "DELETE" });
+    if (res.ok) router.refresh();
+  };
 
   return (
     <article className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-card">
@@ -217,6 +227,16 @@ export function OrgCampaignCard({
           >
             미리보기
           </Link>
+          <ConfirmDialog
+            title="캠페인 삭제"
+            description={`'${title}' 캠페인을 삭제할까요? 공개 페이지에서도 내려갑니다.`}
+            onConfirm={handleDelete}
+            trigger={
+              <button className="rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50">
+                삭제
+              </button>
+            }
+          />
         </div>
       </div>
     </article>

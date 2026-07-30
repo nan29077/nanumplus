@@ -6,7 +6,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/validation";
 
 const schema = z.object({
-  code: z.string().regex(/^\d{4}$/, "4"),
+  code: z.string().regex(/^\d{1,4}$/, "1~4자리 숫자여야 합니다."),
 });
 
 /**

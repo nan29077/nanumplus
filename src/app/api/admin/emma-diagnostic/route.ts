@@ -115,30 +115,35 @@ export async function GET() {
   }
 
   // 'postgres' 기본 DB에도 EMMA 테이블이 있는지 확인
-  const { PrismaClient } = await import("@prisma/client");
-  const postgresClient = new PrismaClient({
-    datasources: { db: { url: process.env.DATABASE_URL!.replace(/\/[^/]+$/, "/postgres") } },
-    log: [],
-  });
-  try {
-    const pgExists = await postgresClient.$queryRawUnsafe<[{ exists: boolean }]>(
-      `SELECT EXISTS (
-         SELECT 1 FROM information_schema.tables WHERE table_name = $1
-       ) AS exists`,
-      `em_mo_log_${suffix}`
-    );
-    (results as any).postgresDbHasEmma = pgExists[0].exists;
-    if (pgExists[0].exists) {
-      const cnt = await postgresClient.$queryRawUnsafe<[{ count: bigint }]>(
-        `SELECT COUNT(*) AS count FROM em_mo_log_${suffix}`
+  const { PrismaClient: PrismaClientTemp } = await import("@prisma/client");
+  const postgresUrl = process.env.DATABASE_URL?.replace(/\/[^/?]+(\?|$)/, "/postgres$1");
+  const postgresClient = postgresUrl
+    ? new PrismaClientTemp({ datasources: { db: { url: postgresUrl } }, log: [] })
+    : null;
+  if (postgresClient) {
+    try {
+      const pgExists = await postgresClient.$queryRawUnsafe<[{ exists: boolean }]>(
+        `SELECT EXISTS (
+           SELECT 1 FROM information_schema.tables WHERE table_name = $1
+         ) AS exists`,
+        `em_mo_log_${suffix}`
       );
-      (results as any).postgresDbMoCount = Number(cnt[0].count);
+      (results as any).postgresDbHasEmma = pgExists[0].exists;
+      if (pgExists[0].exists) {
+        const cnt = await postgresClient.$queryRawUnsafe<[{ count: bigint }]>(
+          `SELECT COUNT(*) AS count FROM em_mo_log_${suffix}`
+        );
+        (results as any).postgresDbMoCount = Number(cnt[0].count);
+      }
+    } catch (e) {
+      (results as any).postgresDbHasEmma = false;
+      (results as any).postgresDbError = e instanceof Error ? e.message : String(e);
+    } finally {
+      await postgresClient.$disconnect();
     }
-  } catch (e) {
+  } else {
     (results as any).postgresDbHasEmma = false;
-    (results as any).postgresDbError = e instanceof Error ? e.message : String(e);
-  } finally {
-    await postgresClient.$disconnect();
+    (results as any).postgresDbError = "DATABASE_URL 미설정";
   }
 
   // donation_platform의 em_ 관련 테이블 전부 나열 (EMMA 설치 흔적 탐지)

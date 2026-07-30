@@ -12,7 +12,7 @@ export function EmmaRunCronButton() {
     setState("running");
     setResult(null);
     try {
-      const res = await fetch("/api/cron/emma-mo", { method: "GET" });
+      const res = await fetch("/api/admin/emma-run-cron", { method: "GET" });
       const data = await res.json();
       if (data.ok) {
         if (data.skipped) {

@@ -17,7 +17,7 @@ export default async function OrgQrCodePage() {
 
   // 요청 헤더에서 실제 host 추출 → QR 코드가 로컬 네트워크에서도 작동하도록
   const reqHeaders = await headers();
-  const host = reqHeaders.get("x-forwarded-host") ?? reqHeaders.get("host") ?? "localhost:3001";
+  const host = reqHeaders.get("x-forwarded-host") ?? reqHeaders.get("host") ?? "localhost:3005";
   const proto = reqHeaders.get("x-forwarded-proto") ?? "http";
   const baseUrl = `${proto}://${host}`;
 
