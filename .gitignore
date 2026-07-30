@@ -23,6 +23,9 @@ npm-debug.log*
 EMMA3/
 EMMA_installer.exe
 
+# 기관 관리자 자격증명 (평문 비밀번호 포함)
+prisma/org-admin-*.txt
+
 # 인증서 · 개인키 (보안상 GitHub에 올리지 않음)
 cert/nanum_pri.der
 cert/*.der
