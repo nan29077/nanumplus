@@ -172,7 +172,7 @@ const ORGS: OrgData[] = [
   { aid: "A0000210", name: "(주)여성신문사", smsCode: "9300" },
   { aid: "A0000209", name: "NGO 엔지오", smsCode: null },
   { aid: "A0000208", name: "월드라인", smsCode: null },
-  { aid: "A0000207", name: "세이브더온드런", smsCode: null },
+  { aid: "A0000207", name: "세이브더칠드런", smsCode: null },
   { aid: "A0000206", name: "목동 천주교", smsCode: null },
   { aid: "A0000205", name: "실망이음", smsCode: null },
   { aid: "A0000203", name: "굿네이버스", smsCode: null },

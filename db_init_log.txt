@@ -1,0 +1,79 @@
+나눔플러스 DB 초기화 시작
+
+>>> npm run db:push
+
+> donation-platform@0.1.0 db:push
+> prisma db push
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "nanumplus", schema "public" at "localhost:5432"
+
+PostgreSQL database nanumplus created at localhost:5432
+
+Your database is now in sync with your Prisma schema. Done in 640ms
+
+Running generate... (Use --skip-generate to skip the generators)
+[2K[1A[2K[GRunning generate... - Prisma Client
+[2K[1A[2K[GEPERM: operation not permitted, rename 'E:\프로젝트\nanumplus\node_modules\.pris
+ma\client\query_engine-windows.dll.node.tmp18896' -> 'E:\프로젝트\nanumplus\node
+_modules\.prisma\client\query_engine-windows.dll.node'
+
+종료 코드: 0
+
+>>> npm run db:seed
+
+> donation-platform@0.1.0 db:seed
+> tsx prisma/seed.ts
+
+🌱 시드 데이터 확인 중 (기존 데이터 유지)...
+ℹ️  이미 존재하는 데이터는 삭제하지 않습니다.
+
+✅ 최고 관리자: admin@onjung.kr / admin1234
+✅ 기관: 따뜻한손길복지재단 (#2540-1234) · manager1@onjung.kr / org1234
+✅ 기관: 푸른희망아동센터 (#2540-2580) · manager2@onjung.kr / org1234
+✅ 기관: 한울타리노인복지회 (#2540-7942) · manager3@onjung.kr / org1234
+✅ 기관: 빛나는미래장애인센터 (#2540-3310) · manager4@onjung.kr / org1234
+✅ 기관: 새벽이슬청소년쉼터 (#2540-5621) · manager5@onjung.kr / org1234
+✅ 기관: 행복나눔다문화센터 (#2540-8834) · manager6@onjung.kr / org1234
+✅ 캠페인 12개 확인 (신규 12개 생성)
+✅ 후원자 60명 생성
+✅ 후원 265건 생성 (SMS senderPhone/smsBody 포함)
+✅ 정기후원 27건 생성
+✅ 정산 데이터 18건 확인/생성
+✅ 웹훅 이벤트 12건 생성
+
+✅ 시드 완료! (기존 데이터 유지됨)
+═══════════════════════════════════════════════════
+최고 관리자  : admin@onjung.kr / admin1234
+───────────────────────────────────────────────────
+기관 관리자  : manager1@onjung.kr / org1234  (따뜻한손길복지재단)
+             manager2@onjung.kr / org1234  (푸른희망아동센터)
+             manager3@onjung.kr / org1234  (한울타리노인복지회)
+             manager4@onjung.kr / org1234  (빛나는미래장애인센터)
+             manager5@onjung.kr / org1234  (새벽이슬청소년쉼터)
+             manager6@onjung.kr / org1234  (행복나눔다문화센터)
+═══════════════════════════════════════════════════
+QR코드 → /donate/[slug] 후원 페이지로 연결됩니다.
+종료 코드: 0
+
+>>> npm run db:init-admin
+
+> donation-platform@0.1.0 db:init-admin
+> tsx prisma/init-admin.ts
+
+🔑 테스트 관리자 계정 초기화 시작...
+
+✅ 최고관리자 : admin@onjung.kr / admin1234
+✅ 기관관리자 : manager1@onjung.kr / org1234  (소속: 따뜻한손길복지재단)
+
+═══════════════════════════════════════════════════
+현재 DB의 최고관리자 계정 (1개)
+═══════════════════════════════════════════════════
+  · admin@onjung.kr  (나눔플러스 최고관리자) — 활성
+═══════════════════════════════════════════════════
+로그인 주소 : http://localhost:3005/login
+═══════════════════════════════════════════════════
+종료 코드: 0
+
+✅ 완료!

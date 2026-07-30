@@ -1,0 +1,58 @@
+@echo off
+chcp 65001 > nul
+echo ==========================================
+echo  나눔플러스 DB 초기화 시작
+echo ==========================================
+echo.
+
+echo [1/5] .env 파일 생성 중...
+(
+echo DATABASE_URL="postgresql://postgres:rmachs1734@localhost:5432/nanumplus"
+echo NEXTAUTH_SECRET="nanumplus-secret-key"
+echo NEXTAUTH_URL="http://localhost:3005"
+) > "E:\프로젝트\nanumplus\.env"
+
+if exist "E:\프로젝트\nanumplus\.env" (
+    echo .env 파일 생성 완료!
+) else (
+    echo .env 파일 생성 실패!
+    pause
+    exit /b 1
+)
+
+echo.
+echo [2/5] npm run db:push 실행 중... (DB 스키마 적용)
+cd /d "E:\프로젝트\nanumplus"
+call npm run db:push
+if errorlevel 1 (
+    echo db:push 실패!
+    pause
+    exit /b 1
+)
+
+echo.
+echo [3/5] npm run db:seed 실행 중... (기본 데이터 시딩)
+call npm run db:seed
+if errorlevel 1 (
+    echo db:seed 실패!
+    pause
+    exit /b 1
+)
+
+echo.
+echo [4/5] npm run db:init-admin 실행 중... (테스트 계정 생성)
+call npm run db:init-admin
+if errorlevel 1 (
+    echo db:init-admin 실패!
+    pause
+    exit /b 1
+)
+
+echo.
+echo ==========================================
+echo  초기화 완료! 이제 개발 서버를 시작합니다.
+echo  서버 주소: http://localhost:3005
+echo ==========================================
+echo.
+start "나눔플러스 Dev Server" cmd /k "cd /d E:\프로젝트\nanumplus && npm run dev"
+pause
