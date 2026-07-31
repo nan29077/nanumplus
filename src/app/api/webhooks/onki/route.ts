@@ -43,13 +43,29 @@ export async function POST(req: Request) {
           status === "COMPLETED" ? "COMPLETED" :
           status === "FAILED" ? "FAILED" :
           status === "REFUNDED" ? "REFUNDED" : donation.status;
+
         await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-          await tx.donation.update({ where: { id: donation.id }, data: { status: next } });
-          if (donation.campaignId && donation.status !== "COMPLETED" && next === "COMPLETED") {
-            await tx.campaign.update({
-              where: { id: donation.campaignId },
-              data: { currentAmount: { increment: donation.amount } },
-            });
+          // C-3 이중 가산 방지: 이미 next 상태이면 updateMany가 0건 반환 → 중복 처리 건너뜀
+          const updated = await tx.donation.updateMany({
+            where: { id: donation.id, status: { not: next } },
+            data: { status: next },
+          });
+
+          if (donation.campaignId && updated.count > 0) {
+            // PENDING/FAILED → COMPLETED: 모금액 가산
+            if (donation.status !== "COMPLETED" && next === "COMPLETED") {
+              await tx.campaign.update({
+                where: { id: donation.campaignId },
+                data: { currentAmount: { increment: donation.amount } },
+              });
+            }
+            // C-4 환불 처리: COMPLETED → REFUNDED 시 모금액 차감
+            if (donation.status === "COMPLETED" && next === "REFUNDED") {
+              await tx.campaign.update({
+                where: { id: donation.campaignId },
+                data: { currentAmount: { decrement: donation.amount } },
+              });
+            }
           }
         });
       }
