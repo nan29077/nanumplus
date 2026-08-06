@@ -29,11 +29,10 @@ export function settlementPeriod(date: Date): string {
 async function loadFeeMap(organizationIds: string[]): Promise<Map<string, Map<string, number>>> {
   if (organizationIds.length === 0) return new Map();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // MI-1: (prisma as any) 캐스팅 제거 — OrganizationFee가 이미 prisma 클라이언트에 포함됨
   let fees: { organizationId: string; channel: string; feePercent: number }[] = [];
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    fees = await (prisma as any).organizationFee.findMany({
+    fees = await prisma.organizationFee.findMany({
       where: { organizationId: { in: organizationIds } },
       select: { organizationId: true, channel: true, feePercent: true },
     });
@@ -149,28 +148,32 @@ export async function generateSettlements(organizationId?: string) {
     });
 
     if (!existing) {
-      const s = await prisma.settlement.create({
-        data: {
-          organizationId: g.organizationId,
-          period: g.period,
-          scheduledDate: g.scheduledDate,
-          totalAmount: total,
-          feeAmount: fee,
-          netAmount: net,
-          bankName: g.bankName,
-          bankAccount: g.bankAccount,
-          bankHolder: g.bankHolder,
-          items: {
-            create: g.items.map((i) => ({
-              donationId: i.donationId,
-              amount: i.amount,
-              channel: i.channel,
-              donatedAt: i.donatedAt,
-            })),
+      // M-6: 정산 레코드 + 항목을 명시적 트랜잭션으로 묶어 원자성 보장.
+      // Prisma nested create는 내부적으로 트랜잭션이지만,
+      // 향후 금액 계산 로직 추가 시에도 안전하게 확장 가능하도록 명시한다.
+      await prisma.$transaction(async (tx) => {
+        await tx.settlement.create({
+          data: {
+            organizationId: g.organizationId,
+            period: g.period,
+            scheduledDate: g.scheduledDate,
+            totalAmount: total,
+            feeAmount: fee,
+            netAmount: net,
+            bankName: g.bankName,
+            bankAccount: g.bankAccount,
+            bankHolder: g.bankHolder,
+            items: {
+              create: g.items.map((i) => ({
+                donationId: i.donationId,
+                amount: i.amount,
+                channel: i.channel,
+                donatedAt: i.donatedAt,
+              })),
+            },
           },
-        },
+        });
       });
-      void s;
       created++;
     } else {
       // 기존 정산에 새 항목 추가.

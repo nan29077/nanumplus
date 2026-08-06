@@ -11,18 +11,23 @@ export async function GET(req: Request) {
   const status = searchParams.get("status") || undefined;
   const period = searchParams.get("period") || undefined;
 
-  const settlements = await prisma.settlement.findMany({
-    where: {
-      ...(orgId ? { organizationId: orgId } : {}),
-      ...(status ? { status: status as never } : {}),
-      ...(period ? { period } : {}),
-    },
-    include: {
-      organization: { select: { id: true, name: true, bankName: true, bankAccount: true, bankHolder: true } },
-      _count: { select: { items: true } },
-    },
-    orderBy: [{ scheduledDate: "desc" }, { organizationId: "asc" }],
-  });
+  try {
+    const settlements = await prisma.settlement.findMany({
+      where: {
+        ...(orgId ? { organizationId: orgId } : {}),
+        ...(status ? { status: status as never } : {}),
+        ...(period ? { period } : {}),
+      },
+      include: {
+        organization: { select: { id: true, name: true, bankName: true, bankAccount: true, bankHolder: true } },
+        _count: { select: { items: true } },
+      },
+      orderBy: [{ scheduledDate: "desc" }, { organizationId: "asc" }],
+    });
 
-  return Response.json({ settlements });
+    return Response.json({ settlements });
+  } catch (e) {
+    console.error("[settlements] 정산 목록 조회 오류:", e);
+    return Response.json({ error: "정산 목록 조회 중 오류가 발생했습니다." }, { status: 500 });
+  }
 }

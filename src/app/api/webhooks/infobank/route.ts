@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getInfobankAdapter } from "@/lib/adapters";
 import { SMS_DONATION_AMOUNT } from "@/lib/validation";
@@ -63,15 +64,27 @@ export async function POST(req: Request) {
           status === "FAILED"    ? "FAILED"    :
           donation.status;
 
-        await prisma.donation.update({
-          where: { id: donation.id },
-          data: {
-            status: next,
-            amount: SMS_DONATION_AMOUNT, // 항상 3,000원으로 보정
-            donatedAt: next === "COMPLETED" ? new Date() : donation.donatedAt,
-            smsBody: smsBody ?? donation.smsBody,
-            senderPhone: senderPhone ?? donation.senderPhone,
-          },
+        // M-4: 후원 상태 업데이트 + 캠페인 모금액 업데이트를 트랜잭션으로 처리
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+          // 이중 가산 방지: 이미 next 상태이면 updateMany가 0건 반환 → 중복 처리 건너뜀
+          const updated = await tx.donation.updateMany({
+            where: { id: donation.id, status: { not: next } },
+            data: {
+              status: next,
+              amount: SMS_DONATION_AMOUNT, // 항상 3,000원으로 보정
+              donatedAt: next === "COMPLETED" ? new Date() : donation.donatedAt,
+              smsBody: smsBody ?? donation.smsBody,
+              senderPhone: senderPhone ?? donation.senderPhone,
+            },
+          });
+
+          // 캠페인 모금액 업데이트 — COMPLETED 전환 시에만
+          if (donation.campaignId && updated.count > 0 && donation.status !== "COMPLETED" && next === "COMPLETED") {
+            await tx.campaign.update({
+              where: { id: donation.campaignId },
+              data: { currentAmount: { increment: SMS_DONATION_AMOUNT } },
+            });
+          }
         });
 
         // MT 발송 — 완료된 경우에만
@@ -95,18 +108,28 @@ export async function POST(req: Request) {
             where: { smsFullNumber, deletedAt: null },
           });
           if (org) {
-            await prisma.donation.create({
-              data: {
-                organizationId: org.id,
-                channel: "SMS",
-                amount: SMS_DONATION_AMOUNT,
-                status: "COMPLETED",
-                providerName: "infobank",
-                providerTransactionId: txId,
-                smsBody,
-                senderPhone,
-                donatedAt: new Date(),
-              },
+            // M-4: 웹훅 선착 케이스 — donation 생성 + 캠페인 모금액 업데이트를 트랜잭션으로 처리
+            await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+              const newDonation = await tx.donation.create({
+                data: {
+                  organizationId: org.id,
+                  channel: "SMS",
+                  amount: SMS_DONATION_AMOUNT,
+                  status: "COMPLETED",
+                  providerName: "infobank",
+                  providerTransactionId: txId,
+                  smsBody,
+                  senderPhone,
+                  donatedAt: new Date(),
+                },
+              });
+              // 캠페인 ID가 있는 경우 모금액 업데이트
+              if (newDonation.campaignId) {
+                await tx.campaign.update({
+                  where: { id: newDonation.campaignId },
+                  data: { currentAmount: { increment: SMS_DONATION_AMOUNT } },
+                });
+              }
             });
 
             // MT 발송

@@ -30,11 +30,10 @@ export async function GET(
   });
   if (!org) return NextResponse.json({ error: "기관을 찾을 수 없습니다." }, { status: 404 });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // MI-1: (prisma as any) 캐스팅 제거
   let fees: { channel: string; feePercent: number }[] = [];
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    fees = await (prisma as any).organizationFee.findMany({
+    fees = await prisma.organizationFee.findMany({
       where: { organizationId: params.id },
       select: { channel: true, feePercent: true },
       orderBy: { channel: "asc" },
@@ -74,13 +73,11 @@ export async function PUT(
     return NextResponse.json({ error: "입력값이 올바르지 않습니다.", issues: parsed.error.issues }, { status: 400 });
   }
 
-  // OrganizationFee upsert (채널별)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const prismaAny = prisma as any;
+  // OrganizationFee upsert (채널별) — MI-1: (prisma as any) 캐스팅 제거
   try {
     await Promise.all(
       parsed.data.fees.map((f) =>
-        prismaAny.organizationFee.upsert({
+        prisma.organizationFee.upsert({
           where: {
             organizationId_channel: {
               organizationId: params.id,

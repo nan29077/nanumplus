@@ -2,15 +2,10 @@
  * 전체 후원 내역 raw SQL 헬퍼
  * SMS 채널 후원은 organizationId가 null일 수 있어 Prisma ORM 대신 raw SQL 사용
  */
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fmtKst } from "@/lib/kst-date";
 import type { DonationRow } from "@/components/donation/donation-table";
-
-const WHERE =
-  'd."deletedAt" IS NULL' +
-  ' AND ($1::text IS NULL OR d."organizationId" = $1)' +
-  ' AND ($2::text IS NULL OR d.channel = $2::"DonationChannel")' +
-  ' AND ($3::text IS NULL OR d.status = $3::"DonationStatus")';
 
 export async function fetchAllDonations(
   orgId: string | null,
@@ -19,23 +14,32 @@ export async function fetchAllDonations(
   take: number,
   skip: number
 ): Promise<{ rows: DonationRow[]; total: number }> {
-  const selectSql =
-    'SELECT d.id, d.amount::float8 AS amount, d.channel::text, d.status::text,' +
-    ' d."donatedAt", d."senderPhone", dn.name AS "donorName",' +
-    ' o.name AS "orgName", c.title AS "campaignTitle"' +
-    ' FROM "Donation" d' +
-    ' LEFT JOIN "Donor" dn ON d."donorId" = dn.id' +
-    ' LEFT JOIN "Organization" o ON d."organizationId" = o.id' +
-    ' LEFT JOIN "Campaign" c ON d."campaignId" = c.id' +
-    ' WHERE ' + WHERE +
-    ' ORDER BY d."donatedAt" DESC LIMIT ' + take + ' OFFSET ' + skip;
-
-  const countSql =
-    'SELECT COUNT(*) AS count FROM "Donation" d WHERE ' + WHERE;
-
+  // M-8: LIMIT/OFFSET을 Prisma.sql 템플릿 리터럴로 파라미터 바인딩하여 직접 삽입 제거.
+  // take/skip은 서버에서 생성한 숫자값이지만, 파라미터 바인딩으로 통일해 SQL 인젝션 방어를 명확히 한다.
   const [rawRows, countRows] = await Promise.all([
-    prisma.$queryRawUnsafe(selectSql, orgId, channel, status),
-    prisma.$queryRawUnsafe(countSql, orgId, channel, status),
+    prisma.$queryRaw<unknown[]>(Prisma.sql`
+      SELECT d.id, d.amount::float8 AS amount, d.channel::text, d.status::text,
+             d."donatedAt", d."senderPhone", dn.name AS "donorName",
+             o.name AS "orgName", c.title AS "campaignTitle"
+      FROM "Donation" d
+      LEFT JOIN "Donor" dn ON d."donorId" = dn.id
+      LEFT JOIN "Organization" o ON d."organizationId" = o.id
+      LEFT JOIN "Campaign" c ON d."campaignId" = c.id
+      WHERE d."deletedAt" IS NULL
+        AND (${orgId}::text IS NULL OR d."organizationId" = ${orgId})
+        AND (${channel}::text IS NULL OR d.channel = ${channel}::"DonationChannel")
+        AND (${status}::text IS NULL OR d.status = ${status}::"DonationStatus")
+      ORDER BY d."donatedAt" DESC
+      LIMIT ${take} OFFSET ${skip}
+    `),
+    prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+      SELECT COUNT(*) AS count
+      FROM "Donation" d
+      WHERE d."deletedAt" IS NULL
+        AND (${orgId}::text IS NULL OR d."organizationId" = ${orgId})
+        AND (${channel}::text IS NULL OR d.channel = ${channel}::"DonationChannel")
+        AND (${status}::text IS NULL OR d.status = ${status}::"DonationStatus")
+    `),
   ]);
 
   const rows: DonationRow[] = (rawRows as any[]).map((d) => ({
@@ -52,6 +56,6 @@ export async function fetchAllDonations(
 
   return {
     rows,
-    total: Number((countRows as any[])[0].count),
+    total: Number(countRows[0].count),
   };
 }

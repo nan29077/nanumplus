@@ -28,41 +28,46 @@ export async function POST(req: Request) {
   }
   const { organizationId, campaignId } = parsed.data;
 
-  const org = await prisma.organization.findFirst({
-    where: { id: organizationId, isActive: true, deletedAt: null },
-  });
-  if (!org) return Response.json({ error: "기관을 찾을 수 없습니다." }, { status: 404 });
-  if (!org.smsFullNumber) {
-    return Response.json({ error: "이 기관에는 아직 문자후원 번호가 부여되지 않았습니다." }, { status: 400 });
-  }
+  try {
+    const org = await prisma.organization.findFirst({
+      where: { id: organizationId, isActive: true, deletedAt: null },
+    });
+    if (!org) return Response.json({ error: "기관을 찾을 수 없습니다." }, { status: 404 });
+    if (!org.smsFullNumber) {
+      return Response.json({ error: "이 기관에는 아직 문자후원 번호가 부여되지 않았습니다." }, { status: 400 });
+    }
 
-  const adapter = getInfobankAdapter();
-  const result = await adapter.initDonation({
-    organizationId: org.id,
-    smsFullNumber: org.smsFullNumber,
-    amount: SMS_DONATION_AMOUNT,
-    campaignId: campaignId ?? undefined,
-  });
-  if (!result.ok) {
-    return Response.json({ error: result.message }, { status: 400 });
-  }
-
-  await prisma.donation.create({
-    data: {
+    const adapter = getInfobankAdapter();
+    const result = await adapter.initDonation({
       organizationId: org.id,
-      campaignId: campaignId ?? null,
-      channel: "SMS",
+      smsFullNumber: org.smsFullNumber,
       amount: SMS_DONATION_AMOUNT,
-      status: "PENDING",
-      providerName: adapter.providerName,
-      providerTransactionId: result.data.providerTransactionId,
-    },
-  });
+      campaignId: campaignId ?? undefined,
+    });
+    if (!result.ok) {
+      return Response.json({ error: result.message }, { status: 400 });
+    }
 
-  return Response.json({
-    ok: true,
-    amount: SMS_DONATION_AMOUNT,
-    smsNumber: result.data.smsNumber,
-    guideMessage: result.data.guideMessage,
-  });
+    await prisma.donation.create({
+      data: {
+        organizationId: org.id,
+        campaignId: campaignId ?? null,
+        channel: "SMS",
+        amount: SMS_DONATION_AMOUNT,
+        status: "PENDING",
+        providerName: adapter.providerName,
+        providerTransactionId: result.data.providerTransactionId,
+      },
+    });
+
+    return Response.json({
+      ok: true,
+      amount: SMS_DONATION_AMOUNT,
+      smsNumber: result.data.smsNumber,
+      guideMessage: result.data.guideMessage,
+    });
+  } catch (e) {
+    console.error("[donations/sms/init] 문자후원 시작 오류:", e);
+    return Response.json({ error: "문자후원 처리 중 오류가 발생했습니다." }, { status: 500 });
+  }
 }

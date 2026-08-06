@@ -11,15 +11,20 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const organizationId: string | undefined = body?.organizationId;
 
-  const result = await generateSettlements(organizationId);
+  try {
+    const result = await generateSettlements(organizationId);
 
-  await writeAuditLog({
-    userId: auth.user.id,
-    action: "SETTLEMENT_GENERATE",
-    entityType: "Settlement",
-    detail: { ...result, organizationId },
-    ipAddress: getClientIp(req.headers),
-  });
+    await writeAuditLog({
+      userId: auth.user.id,
+      action: "SETTLEMENT_GENERATE",
+      entityType: "Settlement",
+      detail: { ...result, organizationId },
+      ipAddress: getClientIp(req.headers),
+    });
 
-  return Response.json({ ok: true, ...result });
+    return Response.json({ ok: true, ...result });
+  } catch (e) {
+    console.error("[settlements/generate] 정산 생성 오류:", e);
+    return Response.json({ error: "정산 생성 중 오류가 발생했습니다." }, { status: 500 });
+  }
 }

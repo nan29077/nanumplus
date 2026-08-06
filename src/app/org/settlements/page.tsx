@@ -39,16 +39,14 @@ export default async function OrgSettlementsPage({
     select: { name: true, bankName: true, bankAccount: true, bankHolder: true },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let settlements: any[] = [];
+  let settlements: Awaited<ReturnType<typeof prisma.settlement.findMany>> = [];
   let migrationNeeded = false;
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    settlements = await (prisma as any).settlement.findMany({
+    settlements = await prisma.settlement.findMany({
       where: {
         organizationId: user.organizationId,
-        ...(searchParams.status ? { status: searchParams.status } : {}),
+        ...(searchParams.status ? { status: searchParams.status as never } : {}),
         ...(searchParams.period ? { period: searchParams.period } : {}),
       },
       include: { _count: { select: { items: true } } },

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Users, MessageSquare, Landmark, RefreshCw, ExternalLink } from "lucide-react";
 import { formatKRW } from "@/lib/utils";
@@ -53,8 +54,7 @@ export function CampaignCard({
     <article className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-card transition hover:-translate-y-0.5 hover:shadow-lg">
       <div className="relative h-40 bg-gradient-to-br from-brand-100 to-brand-50">
         {coverImageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={coverImageUrl} alt="" className="h-full w-full object-cover" />
+          <Image src={coverImageUrl} alt="" fill unoptimized className="object-cover" />
         )}
         <span className="absolute left-3 top-3"><StatusBadge status={status} /></span>
         {slug && (
@@ -152,8 +152,7 @@ export function OrgCampaignCard({
       {/* 커버 */}
       <div className="relative h-36 bg-gradient-to-br from-brand-100 to-brand-50">
         {coverImageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={coverImageUrl} alt="" className="h-full w-full object-cover" />
+          <Image src={coverImageUrl} alt="" fill unoptimized className="object-cover" />
         )}
         <div className="absolute inset-x-3 top-3 flex items-start justify-between">
           <StatusBadge status={status} />

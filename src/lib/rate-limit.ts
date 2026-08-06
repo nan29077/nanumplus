@@ -1,6 +1,14 @@
 /**
  * 간단한 인메모리 rate limiter (싱글 인스턴스 기준).
- * 프로덕션에서는 Redis 기반(Upstash 등)으로 교체 권장.
+ *
+ * M-7 주의사항 — 멀티 프로세스/멀티 인스턴스 환경 제한:
+ *  - 이 구현은 Node.js 프로세스 메모리에 상태를 저장하므로
+ *    PM2 cluster 모드, Docker 다중 컨테이너, Vercel Edge 등
+ *    멀티 인스턴스 배포 시 인스턴스별 독립 카운터가 유지됩니다.
+ *  - 즉, 공격자가 N개 인스턴스로 요청을 분산하면 limit * N 요청을 허용합니다.
+ *
+ * 프로덕션 권장: Redis 기반(Upstash Redis + @upstash/ratelimit 라이브러리)으로 교체.
+ *  예시: https://github.com/upstash/ratelimit
  */
 const buckets = new Map<string, { count: number; resetAt: number }>();
 

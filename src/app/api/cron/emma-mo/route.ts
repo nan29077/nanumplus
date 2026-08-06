@@ -7,10 +7,11 @@
  *  - Windows 작업 스케줄러로 1분마다 호출 (emma-cron.bat 참조)
  *  - 또는 외부 크론 서비스 (ex. cron-job.org) 에서 호출
  *
- * 보안:
- *  - EMMA_CRON_SECRET 환경변수가 설정된 경우 Authorization 헤더 또는
- *    ?secret= 쿼리 파라미터로 검증
- *  - 미설정 시 로컬 환경 전용으로 간주하고 허용
+ * 보안 (M-1):
+ *  - EMMA_CRON_SECRET 환경변수가 반드시 설정되어야 합니다.
+ *  - Authorization: Bearer <secret> 헤더 또는 ?secret= 쿼리 파라미터로 검증.
+ *  - 미설정 시 서버 설정 오류로 간주하여 모든 요청을 거부합니다.
+ *    (빈 문자열로 인증을 우회하는 버그 방지)
  *
  * INFOBANK_PROVIDER=live 이고 EMMA_ID가 설정된 경우에만 실제 처리.
  */
@@ -22,19 +23,24 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Vercel 환경 시 최대 실행 시간(초)
 
 export async function GET(req: NextRequest) {
-  // 보안 검증
+  // M-1: EMMA_CRON_SECRET 미설정 시 무조건 거부 (빈 문자열 인증 우회 방지)
   const cronSecret = process.env.EMMA_CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization");
-    const querySecret = req.nextUrl.searchParams.get("secret");
-    const provided = authHeader?.replace("Bearer ", "") ?? querySecret ?? "";
+  if (!cronSecret) {
+    return NextResponse.json(
+      { error: "EMMA_CRON_SECRET이 설정되지 않았습니다. 환경변수를 확인해 주세요." },
+      { status: 500 }
+    );
+  }
 
-    if (provided !== cronSecret) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+  const authHeader = req.headers.get("authorization");
+  const querySecret = req.nextUrl.searchParams.get("secret");
+  const provided = authHeader?.replace("Bearer ", "") ?? querySecret ?? "";
+
+  if (provided !== cronSecret) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
   }
 
   // EMMA 활성화 여부 확인

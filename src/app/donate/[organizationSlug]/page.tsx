@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { startOfMonth } from "date-fns";
 import { Users, HandCoins, CalendarDays } from "lucide-react";
 import { prisma } from "@/lib/prisma";
@@ -35,8 +36,7 @@ export default async function DonatePage({
         <div className="mx-auto max-w-2xl px-4 py-10">
           <div className="rounded-3xl border border-stone-200 bg-white p-7 text-center shadow-card">
             {org.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={org.logoUrl} alt={`${org.name} 로고`} className="mx-auto h-16 w-16 rounded-2xl object-cover" />
+              <Image src={org.logoUrl} alt={`${org.name} 로고`} width={64} height={64} unoptimized className="mx-auto rounded-2xl object-cover" />
             ) : (
               <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-brand-50 text-2xl font-bold text-brand-600">
                 {org.name[0]}

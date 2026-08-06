@@ -56,10 +56,9 @@ export default async function AdminSettlementsPage({
         select: { id: true, name: true, bankName: true, bankAccount: true, bankHolder: true },
         orderBy: { name: "asc" },
       }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (prisma as any).settlement.findMany({
+      prisma.settlement.findMany({
         where: {
-          ...(searchParams.status ? { status: searchParams.status } : {}),
+          ...(searchParams.status ? { status: searchParams.status as never } : {}),
           ...(searchParams.orgId ? { organizationId: searchParams.orgId } : {}),
           ...(searchParams.period ? { period: searchParams.period } : {}),
         },

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Plus, Building2, ChevronRight } from "lucide-react";
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
@@ -66,10 +67,9 @@ export default async function AdminOrganizationsPage() {
                 className="group rounded-2xl border border-stone-200 bg-white p-5 shadow-card transition hover:border-brand-300 hover:shadow-lg">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="grid h-11 w-11 place-items-center overflow-hidden rounded-xl bg-brand-50 text-brand-600">
+                    <span className="relative grid h-11 w-11 place-items-center overflow-hidden rounded-xl bg-brand-50 text-brand-600">
                       {o.logoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={o.logoUrl} alt="" className="h-full w-full object-cover" />
+                        <Image src={o.logoUrl} alt="" fill unoptimized className="object-cover" />
                       ) : (
                         <Building2 className="h-5 w-5" strokeWidth={1.75} />
                       )}

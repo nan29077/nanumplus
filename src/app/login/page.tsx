@@ -74,10 +74,11 @@ export default function LoginPage() {
           <h1 className="text-lg font-bold text-stone-900">관리자 로그인</h1>
           <p className="mt-1 text-sm text-stone-500">이메일과 비밀번호로 로그인하세요.</p>
 
-          <label className="mt-5 block text-sm font-medium text-stone-700">이메일</label>
+          <label htmlFor="login-email" className="mt-5 block text-sm font-medium text-stone-700">이메일</label>
           <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2.5 focus-within:border-brand-500">
             <Mail className="h-4 w-4 shrink-0 text-stone-400" strokeWidth={1.75} />
             <input
+              id="login-email"
               type="email"
               required
               value={email}
@@ -87,10 +88,11 @@ export default function LoginPage() {
             />
           </div>
 
-          <label className="mt-4 block text-sm font-medium text-stone-700">비밀번호</label>
+          <label htmlFor="login-password" className="mt-4 block text-sm font-medium text-stone-700">비밀번호</label>
           <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2.5 focus-within:border-brand-500">
             <Lock className="h-4 w-4 shrink-0 text-stone-400" strokeWidth={1.75} />
             <input
+              id="login-password"
               type="password"
               required
               value={password}

@@ -47,37 +47,37 @@ export function NewOrganizationForm() {
         <div className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelCls}>기관명 *</label>
-              <input required value={form.name}
+              <label htmlFor="org-name" className={labelCls}>기관명 *</label>
+              <input id="org-name" required value={form.name}
                 onChange={(e) => { set("name", e.target.value); if (!form.slug) set("slug", sanitizeSlug(e.target.value)); }}
                 placeholder="예: 따뜻한손길복지재단" className={field} />
             </div>
             <div>
-              <label className={labelCls}>후원 페이지 주소(slug) *</label>
+              <label htmlFor="org-slug" className={labelCls}>후원 페이지 주소(slug) *</label>
               <div className="mt-1.5 flex items-center rounded-xl border border-stone-200 px-3 focus-within:border-brand-500">
                 <span className="text-sm text-stone-400">/donate/</span>
-                <input required value={form.slug}
+                <input id="org-slug" required value={form.slug}
                   onChange={(e) => set("slug", sanitizeSlug(e.target.value))}
                   placeholder="warmhands" className="flex-1 bg-transparent py-2.5 pl-1 text-sm outline-none" />
               </div>
             </div>
           </div>
           <div>
-            <label className={labelCls}>기관 소개</label>
-            <textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} className={field} />
+            <label htmlFor="org-description" className={labelCls}>기관 소개</label>
+            <textarea id="org-description" rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} className={field} />
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <label className={labelCls}>주소</label>
-              <input value={form.address} onChange={(e) => set("address", e.target.value)} className={field} />
+              <label htmlFor="org-address" className={labelCls}>주소</label>
+              <input id="org-address" value={form.address} onChange={(e) => set("address", e.target.value)} className={field} />
             </div>
             <div>
-              <label className={labelCls}>대표 전화</label>
-              <input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="02-000-0000" className={field} />
+              <label htmlFor="org-phone" className={labelCls}>대표 전화</label>
+              <input id="org-phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="02-000-0000" className={field} />
             </div>
             <div>
-              <label className={labelCls}>기관 이메일</label>
-              <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className={field} />
+              <label htmlFor="org-email" className={labelCls}>기관 이메일</label>
+              <input id="org-email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className={field} />
             </div>
           </div>
         </div>
@@ -125,16 +125,16 @@ export function NewOrganizationForm() {
         <p className="mt-1 text-sm text-stone-500">이 계정으로 기관 관리자가 로그인하여 본인 기관 데이터를 관리합니다.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div>
-            <label className={labelCls}>이름 *</label>
-            <input required value={form.adminName} onChange={(e) => set("adminName", e.target.value)} className={field} />
+            <label htmlFor="admin-name" className={labelCls}>이름 *</label>
+            <input id="admin-name" required value={form.adminName} onChange={(e) => set("adminName", e.target.value)} className={field} />
           </div>
           <div>
-            <label className={labelCls}>이메일 *</label>
-            <input type="email" required value={form.adminEmail} onChange={(e) => set("adminEmail", e.target.value)} className={field} />
+            <label htmlFor="admin-email" className={labelCls}>이메일 *</label>
+            <input id="admin-email" type="email" required value={form.adminEmail} onChange={(e) => set("adminEmail", e.target.value)} className={field} />
           </div>
           <div>
-            <label className={labelCls}>초기 비밀번호 *</label>
-            <input type="text" required minLength={8} value={form.adminPassword}
+            <label htmlFor="admin-password" className={labelCls}>초기 비밀번호 *</label>
+            <input id="admin-password" type="password" required minLength={8} value={form.adminPassword}
               onChange={(e) => set("adminPassword", e.target.value)} placeholder="8자 이상" className={field} />
           </div>
         </div>

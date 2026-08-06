@@ -39,8 +39,7 @@ export default async function AdminOrganizationDetailPage({ params }: { params: 
   const CHANNELS = ["SMS", "EASY_TRANSFER", "RECURRING_TRANSFER"] as const;
   let fees: { channel: string; feePercent: number; isDefault: boolean }[] = [];
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const dbFees: { channel: string; feePercent: number }[] = await (prisma as any).organizationFee.findMany({
+    const dbFees = await prisma.organizationFee.findMany({
       where: { organizationId: org.id },
       select: { channel: true, feePercent: true },
     });

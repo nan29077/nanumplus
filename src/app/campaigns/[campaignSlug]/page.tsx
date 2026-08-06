@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { CalendarClock, Users, Target, Quote } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatKRW, formatNumber } from "@/lib/utils";
@@ -36,10 +37,9 @@ export default async function CampaignDetailPage({
       <PublicHeader />
       <main className="flex-1 bg-warm-50 pb-32">
         {/* 대표 이미지 */}
-        <div className="h-56 bg-gradient-to-br from-brand-200 to-brand-50 sm:h-72">
+        <div className="relative h-56 bg-gradient-to-br from-brand-200 to-brand-50 sm:h-72">
           {campaign.coverImageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={campaign.coverImageUrl} alt="" className="h-full w-full object-cover" />
+            <Image src={campaign.coverImageUrl} alt="" fill unoptimized className="object-cover" />
           )}
         </div>
 
@@ -101,9 +101,10 @@ export default async function CampaignDetailPage({
               <h2 className="font-bold text-stone-900">현장 이야기</h2>
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {campaign.images.map((img: { id: string; url: string; caption: string | null }) => (
-                  <figure key={img.id}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt={img.caption ?? ""} className="aspect-square w-full rounded-2xl object-cover" />
+                  <figure key={img.id} className="relative">
+                    <div className="relative aspect-square w-full overflow-hidden rounded-2xl">
+                      <Image src={img.url} alt={img.caption ?? ""} fill unoptimized className="object-cover" />
+                    </div>
                     {img.caption && <figcaption className="mt-1 text-xs text-stone-400">{img.caption}</figcaption>}
                   </figure>
                 ))}
