@@ -5,6 +5,7 @@ import {
   Upload, FileSpreadsheet, AlertCircle, CheckCircle2,
   Loader2, Download, Info, ChevronDown, ChevronUp, X,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type PreviewRow = {
   rowNum: number;
@@ -81,9 +82,9 @@ export function OrgMigrationClient() {
   const validRows = preview.filter((r) => r.valid);
   const invalidRows = preview.filter((r) => !r.valid);
 
+  // 기관 일괄 등록 실행 (확인은 ConfirmDialog 트리거에서 처리)
   const handleImport = async () => {
-    if (validRows.length === 0) { alert("가져올 유효한 데이터가 없습니다."); return; }
-    if (!confirm(`${validRows.length}개 기관을 등록합니까? 이미 존재하는 기관명은 건너뜁니다.`)) return;
+    if (validRows.length === 0) return; // 버튼 disabled 조건과 동일한 안전 가드
 
     setImporting(true);
     setResult(null);
@@ -252,16 +253,23 @@ export function OrgMigrationClient() {
                 )}
               </p>
             </div>
-            <button
-              onClick={handleImport}
-              disabled={importing || validRows.length === 0}
-              className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-            >
-              {importing
-                ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
-                : <Upload className="h-4 w-4" strokeWidth={1.75} />}
-              {importing ? "등록 중..." : `${validRows.length}개 기관 등록`}
-            </button>
+            <ConfirmDialog
+              title="기관 일괄 등록"
+              description={`${validRows.length}개 기관을 등록합니까? 이미 존재하는 기관명은 건너뜁니다.`}
+              confirmLabel="등록"
+              onConfirm={handleImport}
+              trigger={
+                <button
+                  disabled={importing || validRows.length === 0}
+                  className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {importing
+                    ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+                    : <Upload className="h-4 w-4" strokeWidth={1.75} />}
+                  {importing ? "등록 중..." : `${validRows.length}개 기관 등록`}
+                </button>
+              }
+            />
           </div>
 
           <div className="overflow-x-auto">

@@ -20,6 +20,7 @@ export function QRCodeCard({
   const [img, setImg] = useState(imageDataUrl);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
 
   const download = () => {
     if (!img) return;
@@ -32,12 +33,20 @@ export function QRCodeCard({
   const regenerate = async () => {
     if (!regenerateEndpoint) return;
     setBusy(true);
-    const res = await fetch(regenerateEndpoint, { method: "POST" });
-    setBusy(false);
-    if (res.ok) {
+    setError("");
+    try {
+      const res = await fetch(regenerateEndpoint, { method: "POST" });
+      if (!res.ok) {
+        setError("QR 재발급에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
       const b = await res.json();
       setImg(b.imageDataUrl);
       router.refresh();
+    } catch {
+      setError("네트워크 오류로 QR 재발급에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -92,6 +101,7 @@ export function QRCodeCard({
               </button>
             )}
           </div>
+          {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
         </div>
       </div>
     </div>

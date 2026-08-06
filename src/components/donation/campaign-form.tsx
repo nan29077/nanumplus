@@ -104,22 +104,31 @@ export function CampaignForm({ initial }: { initial?: Initial }) {
       setError("후원 채널을 하나 이상 선택해 주세요.");
       return;
     }
+    if (!Number.isFinite(form.goalAmount) || form.goalAmount < 10000) {
+      setError("목표 금액을 10,000원 이상 입력해 주세요.");
+      return;
+    }
     setBusy(true);
     setError("");
     const url = isEdit ? `/api/org/campaigns/${initial!.id}` : "/api/org/campaigns";
-    const res = await fetch(url, {
-      method: isEdit ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      const b = await res.json().catch(() => null);
-      setError(b?.error ?? "저장 중 문제가 발생했습니다.");
-      return;
+    try {
+      const res = await fetch(url, {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => null);
+        setError(b?.error ?? "저장 중 문제가 발생했습니다.");
+        return;
+      }
+      router.push("/org/campaigns");
+      router.refresh();
+    } catch {
+      setError("네트워크 오류로 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setBusy(false);
     }
-    router.push("/org/campaigns");
-    router.refresh();
   };
 
   // 달성률 미리보기
@@ -168,7 +177,10 @@ export function CampaignForm({ initial }: { initial?: Initial }) {
                 step={10000}
                 required
                 value={form.goalAmount}
-                onChange={(e) => set("goalAmount", Number(e.target.value))}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  set("goalAmount", Number.isFinite(v) ? v : 0); // 빈 값/잘못된 값에서 NaN 노출 방지
+                }}
                 className={field}
               />
               <p className="mt-1 text-[11px] text-stone-400">

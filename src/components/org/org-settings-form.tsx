@@ -25,19 +25,24 @@ export function OrgSettingsForm({ initial }: {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const res = await fetch("/api/org/settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      const b = await res.json().catch(() => null);
-      setError(b?.error ?? "저장 중 문제가 발생했습니다.");
-      return;
+    try {
+      const res = await fetch("/api/org/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => null);
+        setError(b?.error ?? "저장 중 문제가 발생했습니다.");
+        return;
+      }
+      setDone(true);
+      router.refresh();
+    } catch {
+      setError("네트워크 오류로 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setBusy(false);
     }
-    setDone(true);
-    router.refresh();
   };
 
   return (

@@ -1,6 +1,6 @@
 import { requireOrgAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { parsePageParam } from "@/lib/utils";
+import { parsePageParam, parseStatusParam } from "@/lib/utils";
 import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { Pagination } from "@/components/donation/filter-bar";
@@ -18,11 +18,14 @@ export default async function Page({
   const page = parsePageParam(searchParams.page);
   const take = 18;
 
+  // status 화이트리스트 검증 — 잘못된 값은 무시하고 전체 조회로 폴백
+  const status = parseStatusParam(searchParams.status,
+    ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED"] as const);
   const where = {
     organizationId: user.organizationId,
     deletedAt: null,
     channel: "SMS" as const,
-    ...(searchParams.status ? { status: searchParams.status as never } : {}),
+    ...(status ? { status } : {}),
   };
 
   const [org, donations, total, monthTotal] = await Promise.all([

@@ -14,8 +14,13 @@ export default async function AdminCalendarPage({
 }: { searchParams: { orgId?: string; year?: string; month?: string; date?: string } }) {
   const user = await requireSuperAdmin();
   const now = nowKst();
-  const year = Number(searchParams.year ?? now.getFullYear());
-  const month = Number(searchParams.month ?? now.getMonth() + 1);
+  // year/month 쿼리 파라미터 검증 — 잘못된 값(NaN, 범위 밖)은 현재 날짜로 폴백
+  const rawYear = Number(searchParams.year);
+  const rawMonth = Number(searchParams.month);
+  const year = Number.isInteger(rawYear) && rawYear >= 2000 && rawYear <= 2100
+    ? rawYear : now.getFullYear();
+  const month = Number.isInteger(rawMonth) && rawMonth >= 1 && rawMonth <= 12
+    ? rawMonth : now.getMonth() + 1;
   const scope = orgScope(user, searchParams.orgId);
 
   const [days, dayDonations, orgs] = await Promise.all([

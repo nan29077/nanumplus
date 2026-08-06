@@ -9,6 +9,7 @@ import {
 import { formatKRW } from "@/lib/utils";
 import { fmtKst } from "@/lib/kst-date";
 import { ko } from "date-fns/locale";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type SettlementRow = {
   id: string;
@@ -78,8 +79,8 @@ export function SettlementManagerClient({
     startTransition(() => router.push(`/admin/settlements${buildQuery(params)}`));
   };
 
+  // 정산 데이터 생성 (확인은 ConfirmDialog 트리거에서 처리)
   const handleGenerate = async () => {
-    if (!confirm("미처리 후원 건에 대해 정산 데이터를 생성합니까?")) return;
     setGenerating(true);
     try {
       const res = await fetch("/api/admin/settlements/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
@@ -171,16 +172,23 @@ export function SettlementManagerClient({
           </select>
 
           {/* 정산 데이터 생성 */}
-          <button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-          >
-            {generating
-              ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
-              : <RefreshCw className="h-4 w-4" strokeWidth={1.75} />}
-            정산 데이터 생성
-          </button>
+          <ConfirmDialog
+            title="정산 데이터 생성"
+            description="미처리 후원 건에 대해 정산 데이터를 생성합니까?"
+            confirmLabel="생성"
+            onConfirm={handleGenerate}
+            trigger={
+              <button
+                disabled={generating}
+                className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {generating
+                  ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+                  : <RefreshCw className="h-4 w-4" strokeWidth={1.75} />}
+                정산 데이터 생성
+              </button>
+            }
+          />
         </div>
       </div>
 

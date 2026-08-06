@@ -10,6 +10,7 @@ import {
 import { formatKRW } from "@/lib/utils";
 import { fmtKst } from "@/lib/kst-date";
 import { ko } from "date-fns/locale";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type SettlementRow = {
   id: string;
@@ -92,9 +93,8 @@ export function AdminSettlementClient({
     startTransition(() => router.push(`/admin/settlements?${p.toString()}`));
   };
 
-  // 정산 데이터 생성
+  // 정산 데이터 생성 (확인은 ConfirmDialog 트리거에서 처리)
   const handleGenerate = async () => {
-    if (!confirm("미처리 후원 건에 대해 정산 데이터를 생성합니까?")) return;
     setGenerating(true);
     try {
       const res = await fetch("/api/admin/settlements/generate", {
@@ -135,10 +135,9 @@ export function AdminSettlementClient({
     }
   };
 
-  // 기간별 일괄 정산 완료
+  // 기간별 일괄 정산 완료 (확인은 ConfirmDialog 트리거에서 처리)
   const handleBatchComplete = async (period: string) => {
     const periodLabel = formatPeriod(period);
-    if (!confirm(`${periodLabel} 정산 대기 건을 모두 완료 처리합니까?`)) return;
     setBatchProcessingPeriod(period);
     try {
       const targets = settlements.filter(
@@ -242,16 +241,23 @@ export function AdminSettlementClient({
         )}
 
         <div className="ml-auto">
-          <button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-          >
-            {generating
-              ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
-              : <RefreshCw className="h-4 w-4" strokeWidth={1.75} />}
-            정산 데이터 생성
-          </button>
+          <ConfirmDialog
+            title="정산 데이터 생성"
+            description="미처리 후원 건에 대해 정산 데이터를 생성합니까?"
+            confirmLabel="생성"
+            onConfirm={handleGenerate}
+            trigger={
+              <button
+                disabled={generating}
+                className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {generating
+                  ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+                  : <RefreshCw className="h-4 w-4" strokeWidth={1.75} />}
+                정산 데이터 생성
+              </button>
+            }
+          />
         </div>
       </div>
 
@@ -307,16 +313,23 @@ export function AdminSettlementClient({
                         <p className="text-lg font-bold text-stone-900">{formatKRW(totalAmt)}</p>
                       </div>
                       {!allDone ? (
-                        <button
-                          onClick={() => handleBatchComplete(m.period)}
-                          disabled={isBatchRunning}
-                          className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          {isBatchRunning
-                            ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
-                            : <Play className="h-4 w-4" strokeWidth={2} />}
-                          일괄 정산 실행
-                        </button>
+                        <ConfirmDialog
+                          title="일괄 정산 실행"
+                          description={`${formatPeriod(m.period)} 정산 대기 건을 모두 완료 처리합니까?`}
+                          confirmLabel="실행"
+                          onConfirm={() => handleBatchComplete(m.period)}
+                          trigger={
+                            <button
+                              disabled={isBatchRunning}
+                              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {isBatchRunning
+                                ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+                                : <Play className="h-4 w-4" strokeWidth={2} />}
+                              일괄 정산 실행
+                            </button>
+                          }
+                        />
                       ) : (
                         <span className="flex items-center gap-1 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
                           <CheckCircle2 className="h-4 w-4" strokeWidth={2} />

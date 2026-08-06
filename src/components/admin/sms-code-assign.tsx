@@ -18,19 +18,24 @@ export function SmsCodeAssign({
     setBusy(true);
     setError("");
     setDone(false);
-    const res = await fetch(`/api/admin/organizations/${orgId}/sms-code`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code }),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      const b = await res.json().catch(() => null);
-      setError(b?.error ?? "Error");
-      return;
+    try {
+      const res = await fetch(`/api/admin/organizations/${orgId}/sms-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => null);
+        setError(b?.error ?? "Error");
+        return;
+      }
+      setDone(true);
+      router.refresh();
+    } catch {
+      setError("네트워크 오류로 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setBusy(false);
     }
-    setDone(true);
-    router.refresh();
   };
 
   return (

@@ -26,3 +26,15 @@ export function parsePageParam(raw: string | undefined): number {
   if (!Number.isFinite(parsed) || parsed < 1) return 1;
   return Math.min(parsed, MAX_PAGE);
 }
+
+/**
+ * ?status= 등 쿼리 파라미터로 들어온 enum 값을 화이트리스트로 검증한다.
+ * 허용 목록에 없는 값은 undefined를 반환해 기본값(전체 조회)으로 폴백한다.
+ * (`as never` 타입 우회 없이 Prisma enum 필터에 안전하게 전달하기 위한 헬퍼)
+ */
+export function parseStatusParam<T extends string>(
+  raw: string | null | undefined,
+  allowed: readonly T[]
+): T | undefined {
+  return raw && (allowed as readonly string[]).includes(raw) ? (raw as T) : undefined;
+}

@@ -1,5 +1,6 @@
 import { requireOrgAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { parseStatusParam } from "@/lib/utils";
 import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { OrgSettlementClient } from "@/components/org/org-settlement-client";
@@ -42,11 +43,15 @@ export default async function OrgSettlementsPage({
   let settlements: Awaited<ReturnType<typeof prisma.settlement.findMany>> = [];
   let migrationNeeded = false;
 
+  // status 화이트리스트 검증 — 잘못된 값은 무시하고 전체 조회로 폴백
+  const validStatus = parseStatusParam(searchParams.status,
+    ["PENDING", "PROCESSING", "COMPLETED", "CANCELLED"] as const);
+
   try {
     settlements = await prisma.settlement.findMany({
       where: {
         organizationId: user.organizationId,
-        ...(searchParams.status ? { status: searchParams.status as never } : {}),
+        ...(validStatus ? { status: validStatus } : {}),
         ...(searchParams.period ? { period: searchParams.period } : {}),
       },
       include: { _count: { select: { items: true } } },

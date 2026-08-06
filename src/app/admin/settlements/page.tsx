@@ -1,5 +1,6 @@
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { parseStatusParam } from "@/lib/utils";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminSettlementClient } from "@/components/admin/admin-settlement-client";
@@ -44,6 +45,10 @@ export default async function AdminSettlementsPage({
 }) {
   const user = await requireSuperAdmin();
 
+  // status 화이트리스트 검증 — 잘못된 값은 무시하고 전체 조회로 폴백
+  const validStatus = parseStatusParam(searchParams.status,
+    ["PENDING", "PROCESSING", "COMPLETED", "CANCELLED"] as const);
+
   let organizations: { id: string; name: string; bankName: string | null; bankAccount: string | null; bankHolder: string | null }[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let settlements: any[] = [];
@@ -58,7 +63,7 @@ export default async function AdminSettlementsPage({
       }),
       prisma.settlement.findMany({
         where: {
-          ...(searchParams.status ? { status: searchParams.status as never } : {}),
+          ...(validStatus ? { status: validStatus } : {}),
           ...(searchParams.orgId ? { organizationId: searchParams.orgId } : {}),
           ...(searchParams.period ? { period: searchParams.period } : {}),
         },

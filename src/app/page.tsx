@@ -27,10 +27,10 @@ const reasons = [
 ];
 
 const impactStats = [
-  { num: "120+", label: "등록 기관", icon: Globe },
-  { num: "8.5억+", label: "누적 모금액", icon: TrendingUp },
-  { num: "15,000+", label: "누적 후원자", icon: Users },
-  { num: "99.9%", label: "서비스 안정성", icon: Award },
+  { num: "120+", label: "등록 기관 (목표)", icon: Globe },
+  { num: "8.5억+", label: "누적 모금액 (목표)", icon: TrendingUp },
+  { num: "15,000+", label: "누적 후원자 (목표)", icon: Users },
+  { num: "99.9%", label: "서비스 안정성 (목표)", icon: Award },
 ];
 
 const testimonials = [
@@ -155,7 +155,7 @@ export default function LandingPage() {
         <section className="border-b border-stone-100 bg-white py-8">
           <div className="mx-auto max-w-6xl px-4">
             <p className="mb-6 text-center text-xs font-semibold uppercase tracking-widest text-stone-400">
-              전국 120여 사회복지기관이 신뢰하는 플랫폼
+              전국 120여 사회복지기관이 신뢰하는 플랫폼 (목표)
             </p>
             <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
               {trustBadges.map((b) => (
@@ -640,7 +640,7 @@ export default function LandingPage() {
             />
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               {[
-                { icon: Phone, label: "전화 문의", value: "02-1234-5678", sub: "평일 09:00~18:00" },
+                { icon: Phone, label: "전화 문의", value: "문의처 업데이트 예정", sub: "평일 09:00~18:00" },
                 { icon: Mail, label: "이메일 문의", value: "hello@onjeong.kr", sub: "24시간 접수 가능" },
                 { icon: MapPin, label: "소재지", value: "서울특별시 마포구", sub: "방문 상담 가능" },
               ].map((c) => (
@@ -687,7 +687,7 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="hidden border-l border-brand-600 px-8 py-14 lg:col-span-2 lg:block">
-                <p className="text-sm font-semibold text-brand-200">나눔플러스 도입 기관 현황</p>
+                <p className="text-sm font-semibold text-brand-200">나눔플러스 도입 기관 현황 (예시)</p>
                 <ul className="mt-4 space-y-3">
                   {[
                     { region: "서울·경기", count: "48개 기관" },

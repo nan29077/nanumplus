@@ -14,6 +14,17 @@ export default function LoginPage() {
 
   const [error, setError] = useState("");
 
+  // /after-login 이 되돌려 보낸 오류 파라미터(?error=session|no-org)를 읽어 원인을 안내한다.
+  // (파라미터를 무시하면 사용자는 아무 안내 없이 로그인 화면으로 튕긴 것처럼 보인다)
+  useEffect(() => {
+    const err = new URLSearchParams(window.location.search).get("error");
+    if (err === "session") {
+      setError("세션이 만료되었거나 로그인 정보가 없습니다. 다시 로그인해 주세요.");
+    } else if (err === "no-org") {
+      setError("소속 기관이 지정되지 않은 계정입니다. 최고관리자에게 기관 배정을 요청해 주세요.");
+    }
+  }, []);
+
   // 이미 로그인된 사용자는 대시보드로 바로 이동
   useEffect(() => {
     if (status !== "authenticated") return;

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus, Megaphone } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { parseStatusParam } from "@/lib/utils";
 import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { OrgCampaignCard } from "@/components/donation/campaign-card";
@@ -13,13 +14,17 @@ export default async function OrgCampaignsPage({
 }: { searchParams: { status?: string } }) {
   const user = await requireOrgAdmin();
 
+  // status 화이트리스트 검증 — 잘못된 값은 무시하고 전체 조회로 폴백
+  const status = parseStatusParam(searchParams.status,
+    ["DRAFT", "ACTIVE", "ENDED", "CLOSED"] as const);
+
   const [org, campaigns] = await Promise.all([
     prisma.organization.findUnique({ where: { id: user.organizationId }, select: { name: true } }),
     prisma.campaign.findMany({
       where: {
         organizationId: user.organizationId,
         deletedAt: null,
-        ...(searchParams.status ? { status: searchParams.status as never } : {}),
+        ...(status ? { status } : {}),
       },
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { donations: true } } },

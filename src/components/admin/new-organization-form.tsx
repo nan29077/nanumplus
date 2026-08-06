@@ -24,20 +24,25 @@ export function NewOrganizationForm() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const res = await fetch("/api/admin/organizations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, smsCode: form.smsCode || undefined }),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      const b = await res.json().catch(() => null);
-      setError(b?.error ?? "등록 중 문제가 발생했습니다.");
-      return;
+    try {
+      const res = await fetch("/api/admin/organizations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, smsCode: form.smsCode || undefined }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => null);
+        setError(b?.error ?? "등록 중 문제가 발생했습니다.");
+        return;
+      }
+      const b = await res.json();
+      router.push(`/admin/organizations/${b.organizationId}`);
+      router.refresh();
+    } catch {
+      setError("네트워크 오류로 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setBusy(false);
     }
-    const b = await res.json();
-    router.push(`/admin/organizations/${b.organizationId}`);
-    router.refresh();
   };
 
   return (

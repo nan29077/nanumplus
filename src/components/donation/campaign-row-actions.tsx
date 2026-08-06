@@ -1,16 +1,28 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export function CampaignRowActions({ id, title }: { id: string; title: string }) {
   const router = useRouter();
+  const [error, setError] = useState("");
 
   const remove = async () => {
-    const res = await fetch(`/api/org/campaigns/${id}`, { method: "DELETE" });
-    if (res.ok) router.refresh();
+    setError("");
+    try {
+      const res = await fetch(`/api/org/campaigns/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const b = await res.json().catch(() => null);
+        setError(b?.error ?? "삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    } catch {
+      setError("네트워크 오류로 삭제에 실패했습니다.");
+    }
   };
 
   return (
@@ -29,6 +41,7 @@ export function CampaignRowActions({ id, title }: { id: string; title: string })
           </button>
         }
       />
+      {error && <span className="text-xs text-rose-600">{error}</span>}
     </div>
   );
 }

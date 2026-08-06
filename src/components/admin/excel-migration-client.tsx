@@ -6,6 +6,7 @@ import {
   Loader2, Download, Info, ChevronDown, ChevronUp, X,
 } from "lucide-react";
 import { formatKRW } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Org = { id: string; name: string };
 
@@ -133,10 +134,9 @@ export function ExcelMigrationClient({ organizations }: { organizations: Org[] }
   const validRows = preview.filter((r) => r.valid);
   const invalidRows = preview.filter((r) => !r.valid);
 
+  // 가져오기 실행 (확인은 ConfirmDialog 트리거에서 처리)
   const handleImport = async () => {
-    if (!orgId) { alert("기관을 선택해 주세요."); return; }
-    if (validRows.length === 0) { alert("가져올 유효한 데이터가 없습니다."); return; }
-    if (!confirm(`${validRows.length}건의 후원 데이터를 가져옵니까? 이 작업은 취소할 수 없습니다.`)) return;
+    if (!orgId || validRows.length === 0) return; // 버튼 disabled 조건과 동일한 안전 가드
 
     setImporting(true);
     setResult(null);
@@ -334,16 +334,23 @@ export function ExcelMigrationClient({ organizations }: { organizations: Org[] }
                   {formatKRW(validRows.reduce((s, r) => s + r.amount, 0))}
                 </p>
               </div>
-              <button
-                onClick={handleImport}
-                disabled={importing || !orgId || validRows.length === 0}
-                className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {importing
-                  ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
-                  : <Upload className="h-4 w-4" strokeWidth={1.75} />}
-                {importing ? "가져오는 중..." : `${validRows.length}건 가져오기`}
-              </button>
+              <ConfirmDialog
+                title="후원 데이터 가져오기"
+                description={`${validRows.length}건의 후원 데이터를 가져옵니까? 이 작업은 취소할 수 없습니다.`}
+                confirmLabel="가져오기"
+                onConfirm={handleImport}
+                trigger={
+                  <button
+                    disabled={importing || !orgId || validRows.length === 0}
+                    className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    {importing
+                      ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+                      : <Upload className="h-4 w-4" strokeWidth={1.75} />}
+                    {importing ? "가져오는 중..." : `${validRows.length}건 가져오기`}
+                  </button>
+                }
+              />
             </div>
           </div>
 

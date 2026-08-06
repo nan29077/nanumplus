@@ -17,7 +17,18 @@ export function ConfirmDialog({
 
   return (
     <>
-      <span onClick={() => setOpen(true)}>{trigger}</span>
+      <span
+        onClick={() => setOpen(true)}
+        onKeyDown={(e) => {
+          // 키보드 접근성: Enter/Space로도 다이얼로그를 열 수 있게 한다
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        {trigger}
+      </span>
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-stone-900/40 p-4" role="dialog" aria-modal>
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">

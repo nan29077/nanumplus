@@ -1,6 +1,6 @@
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { parsePageParam } from "@/lib/utils";
+import { parsePageParam, parseStatusParam } from "@/lib/utils";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { Pagination } from "@/components/donation/filter-bar";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 // Prisma 클라이언트가 아직 organizationId: String? 타입을 모르므로
 // 기관배정 없음 필터는 raw SQL로 처리
-const VALID_STATUSES = new Set(["COMPLETED", "FAILED", "PENDING"]);
+const VALID_STATUSES = ["COMPLETED", "FAILED", "PENDING"] as const;
 
 export default async function Page({
   searchParams,
@@ -24,10 +24,7 @@ export default async function Page({
   const take = 18;
 
   const isUnassigned = searchParams.orgId === "__unassigned__";
-  const validStatus =
-    searchParams.status && VALID_STATUSES.has(searchParams.status)
-      ? searchParams.status
-      : null;
+  const validStatus = parseStatusParam(searchParams.status, VALID_STATUSES) ?? null;
 
   const [orgs, monthTotal] = await Promise.all([
     prisma.organization.findMany({
@@ -88,7 +85,7 @@ export default async function Page({
       deletedAt: null,
       channel: "SMS" as const,
       organizationId: searchParams.orgId,
-      ...(validStatus ? { status: validStatus as never } : {}),
+      ...(validStatus ? { status: validStatus } : {}),
     };
     const [donations, cnt] = await Promise.all([
       prisma.donation.findMany({

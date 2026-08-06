@@ -1,6 +1,7 @@
 import { MessageSquare, Phone, Clock, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { formatKRW } from "@/lib/utils";
 import { fmtKst } from "@/lib/kst-date";
+import { maskPhone } from "@/lib/masking";
 
 export type SmsDonationRow = {
   id: string;
@@ -13,17 +14,10 @@ export type SmsDonationRow = {
   recipientNumber?: string | null; // 수신 번호 (기관 미배정 시 표시)
 };
 
-/** 01012345678 → 010-1234-5678 형식으로 포맷 (마스킹 없음) */
+/** 01012345678 → 010-****-5678 형식으로 마스킹 (donor-table과 동일 정책) */
 function formatPhone(phone: string | null): string {
   if (!phone) return "번호 미수신";
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 11) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  }
-  if (digits.length === 10) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-  return phone;
+  return maskPhone(phone);
 }
 
 function statusBadge(status: string) {

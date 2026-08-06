@@ -165,26 +165,35 @@ function TransferForm({ orgSlug, campaignSlug, recurring }: {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!consent) { setError("개인정보 수집·이용에 동의해 주세요."); return; }
+    if (!Number.isFinite(amount) || amount < 1000) {
+      setError("후원 금액을 1,000원 이상 입력해 주세요.");
+      return;
+    }
     setBusy(true);
     setError("");
     const url = recurring ? "/api/donations/recurring/init" : "/api/donations/transfer/init";
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        organizationSlug: orgSlug, campaignSlug,
-        amount, donorName: name, donorPhone: phone, donorEmail: email,
-        privacyConsent: consent,
-        ...(recurring ? { dayOfMonth } : {}),
-      }),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      setError(body?.error ?? "후원 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.");
-      return;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationSlug: orgSlug, campaignSlug,
+          amount, donorName: name, donorPhone: phone, donorEmail: email,
+          privacyConsent: consent,
+          ...(recurring ? { dayOfMonth } : {}),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body?.error ?? "후원 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      setDone(true);
+    } catch {
+      setError("네트워크 오류로 후원 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setBusy(false);
     }
-    setDone(true);
   };
 
   if (done) {
@@ -220,7 +229,10 @@ function TransferForm({ orgSlug, campaignSlug, recurring }: {
         </div>
         <input
           type="number" min={1000} step={1000} value={amount}
-          onChange={(e) => setAmount(Number(e.target.value))}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            setAmount(Number.isFinite(v) ? v : 0); // 빈 값/잘못된 값에서 NaN 노출 방지
+          }}
           className="mt-2 w-full rounded-xl border border-stone-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
           aria-label="직접 입력 금액"
         />

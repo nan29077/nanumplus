@@ -1,5 +1,6 @@
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { parseStatusParam } from "@/lib/utils";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { CampaignCard } from "@/components/donation/campaign-card";
@@ -12,10 +13,14 @@ export default async function AdminCampaignsPage({
 }: { searchParams: { status?: string } }) {
   const user = await requireSuperAdmin();
 
+  // status 화이트리스트 검증 — 잘못된 값은 무시하고 전체 조회로 폴백
+  const status = parseStatusParam(searchParams.status,
+    ["DRAFT", "ACTIVE", "ENDED", "CLOSED"] as const);
+
   const campaigns = await prisma.campaign.findMany({
     where: {
       deletedAt: null,
-      ...(searchParams.status ? { status: searchParams.status as never } : {}),
+      ...(status ? { status } : {}),
     },
     orderBy: { createdAt: "desc" },
     include: {

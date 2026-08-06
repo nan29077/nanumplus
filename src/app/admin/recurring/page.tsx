@@ -1,6 +1,6 @@
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { parsePageParam } from "@/lib/utils";
+import { parsePageParam, parseStatusParam } from "@/lib/utils";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { DonationTable } from "@/components/donation/donation-table";
@@ -16,11 +16,14 @@ export default async function Page({
   const page = parsePageParam(searchParams.page);
   const take = 20;
 
+  // status 화이트리스트 검증 — 잘못된 값은 무시하고 전체 조회로 폴백
+  const status = parseStatusParam(searchParams.status,
+    ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED"] as const);
   const where = {
     deletedAt: null,
     channel: "RECURRING_TRANSFER" as const,
     ...(searchParams.orgId ? { organizationId: searchParams.orgId } : {}),
-    ...(searchParams.status ? { status: searchParams.status as never } : {}),
+    ...(status ? { status } : {}),
   };
 
   const [rows, total, orgs] = await Promise.all([

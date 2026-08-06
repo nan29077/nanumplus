@@ -10,6 +10,7 @@
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { fmtKst, ymKst } from "@/lib/kst-date";
+import { maskPhone } from "@/lib/masking";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -201,9 +202,7 @@ export default async function AdminEmmaSettingsPage() {
                       </div>
                     </td>
                     <td className="py-2.5 text-xs text-stone-600 whitespace-nowrap tabular-nums">
-                      {d.senderPhone
-                        ? d.senderPhone.replace(/\D/g, "").replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3")
-                        : "—"}
+                      {d.senderPhone ? maskPhone(d.senderPhone) : "—"}
                     </td>
                     <td className="py-2.5 max-w-[180px] truncate text-xs text-stone-500">
                       {d.smsBody || "—"}

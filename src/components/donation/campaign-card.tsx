@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Users, MessageSquare, Landmark, RefreshCw, ExternalLink } from "lucide-react";
 import { formatKRW } from "@/lib/utils";
@@ -138,13 +139,24 @@ export function OrgCampaignCard({
   slug: string;
 }) {
   const router = useRouter();
+  const [deleteError, setDeleteError] = useState("");
   const pct = Math.min(100, Math.round((currentAmount / Math.max(goalAmount, 1)) * 100));
   const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / 86_400_000));
   const channels = parseChannels(allowedChannels);
 
   const handleDelete = async () => {
-    const res = await fetch(`/api/org/campaigns/${id}`, { method: "DELETE" });
-    if (res.ok) router.refresh();
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/org/campaigns/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const b = await res.json().catch(() => null);
+        setDeleteError(b?.error ?? "캠페인 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    } catch {
+      setDeleteError("네트워크 오류로 캠페인 삭제에 실패했습니다.");
+    }
   };
 
   return (
@@ -237,6 +249,7 @@ export function OrgCampaignCard({
             }
           />
         </div>
+        {deleteError && <p className="mt-2 text-xs text-rose-600">{deleteError}</p>}
       </div>
     </article>
   );
