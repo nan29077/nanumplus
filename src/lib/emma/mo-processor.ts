@@ -230,6 +230,18 @@ export async function processEmmaMo(): Promise<EmmaMoProcessResult> {
    */
   const normalizeRecipient = (r: string) => r.replace(/^(#2540)(?!-)/, "$1-");
 
+  /**
+   * EMMA 3.7은 수신번호를 mo_recipient(#2540 대표번호)와
+   * emo_recipient(뒷자리, 예: "4679")로 분리해 저장한다.
+   * 두 값을 합쳐 전체 번호(#2540-4679)를 복원한다.
+   * emo_recipient가 '#'으로 시작하면 전체 번호가 담긴 것으로 보고 그대로 사용.
+   */
+  const fullRecipient = (moRecipient: string, emoRecipient: string | null) => {
+    const emo = (emoRecipient ?? "").trim();
+    if (emo.startsWith("#")) return normalizeRecipient(emo);
+    return normalizeRecipient(`${moRecipient}${emo}`);
+  };
+
   for (const suffix of suffixes) {
     let records: EmmaMoRecord[];
     try {
@@ -257,8 +269,8 @@ export async function processEmmaMo(): Promise<EmmaMoProcessResult> {
         continue;
       }
 
-      // 기관 매핑 (mo_recipient 대시 정규화 후 조회)
-      const normalizedRecipient = normalizeRecipient(mo_recipient);
+      // 기관 매핑 (mo_recipient + emo_recipient 결합 → 대시 정규화 후 조회)
+      const normalizedRecipient = fullRecipient(mo_recipient, row.emo_recipient);
       const org = orgByNumber.get(normalizedRecipient);
 
       // 이미 처리된 mo_key 중복 방지 (Donation.providerTransactionId unique)
@@ -276,7 +288,7 @@ export async function processEmmaMo(): Promise<EmmaMoProcessResult> {
       if (!org) {
         // 기관 미배정 번호 — Donation은 생성하되 organizationId=null (최고관리자에 표시)
         // ※ Prisma 클라이언트가 아직 organizationId=nullable을 모르므로 raw SQL 사용
-        console.warn(`[emma-mo] 기관 미매핑: mo_recipient=${mo_recipient} → 기관배정 없음으로 저장`);
+        console.warn(`[emma-mo] 기관 미매핑: recipient=${normalizedRecipient} (mo=${mo_recipient}, emo=${row.emo_recipient ?? ""}) → 기관배정 없음으로 저장`);
         try {
           await prisma.$executeRawUnsafe(
             `INSERT INTO "Donation"

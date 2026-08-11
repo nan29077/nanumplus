@@ -3,7 +3,7 @@
  *
  * EMMA는 DB 테이블 기반으로 동작한다:
  *  - MO(수신): em_mo_log_YYYYMM 테이블에 EMMA가 기록 → 나눔플러스가 폴링
- *  - MT(발신): em_mt_log_YYYYMM 테이블에 나눔플러스가 INSERT → EMMA가 픽업해 발송
+ *  - MT(발신): em_smt_tran 테이블에 나눔플러스가 INSERT → EMMA가 픽업해 발송
  */
 
 /** EMMA MO 로그 레코드 (em_mo_log_YYYYMM) */

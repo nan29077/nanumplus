@@ -31,7 +31,13 @@ cp .env.example .env
 ```bash
 npm run db:push      # 스키마를 DB에 반영
 npm run db:seed      # 데모 데이터(기관 6·후원자 60·후원 200여 건·캠페인 12) 생성
+npm run db:emma      # EMMA(인포뱅크) SP·테이블 설치 — db:push 후 반드시 재실행
 ```
+
+> **주의:** `db:push` 는 Prisma 스키마에 없는 `em_*` 테이블을 모두 삭제합니다.
+> `db:push` 를 실행했다면 `npm run db:emma` 로 EMMA 테이블을 다시 설치하세요.
+> EMMA 연동 활성화는 `.env` 의 `INFOBANK_PROVIDER=live` + `EMMA_ID` 설정,
+> MO 수신 처리는 `/api/cron/emma-mo` 를 주기 호출(1분 권장)하면 됩니다.
 
 ### 4. 개발 서버 실행
 ```bash

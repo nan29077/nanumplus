@@ -8,6 +8,7 @@
     "start": "next start -p 3005",
     "lint": "next lint",
     "db:push": "prisma db push",
+    "db:emma": "bash emma-sql/install.sh",
     "db:seed": "tsx prisma/seed.ts",
     "db:init-admin": "tsx prisma/init-admin.ts",
     "db:studio": "prisma studio"
@@ -17,7 +18,6 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.0",
-    "@esbuild/linux-x64": "^0.28.1",
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",

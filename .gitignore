@@ -39,3 +39,9 @@ cert/*.pfx
 Thumbs.db
 .vscode/
 .idea/
+
+# EMMA 설치본 · DB 덤프 · 개인정보 포함 파일 (git 제외)
+EMMA V.3 for Java/
+EMMA_unix_3_7_1/
+TalkFile_nanumplus_dump.sql
+emma-mo-keys-*.csv

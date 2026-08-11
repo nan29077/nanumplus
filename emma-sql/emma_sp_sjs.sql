@@ -49,12 +49,12 @@ BEGIN
 			stat_date			VARCHAR(8)   NOT NULL,
             stat_servicetype    CHAR(2)      NOT NULL,
             stat_payment_code   VARCHAR(20)  NOT NULL,
-            stat_carrier        NUMBER(5)    NOT NULL,
-            stat_success        NUMBER(11),
-            stat_failure        NUMBER(11),
-            stat_invalid        NUMBER(11),
-            stat_invalid_ib     NUMBER(11),
-            stat_remained       NUMBER(11),
+            stat_carrier        NUMERIC(5)    NOT NULL,
+            stat_success        NUMERIC(11),
+            stat_failure        NUMERIC(11),
+            stat_invalid        NUMERIC(11),
+            stat_invalid_ib     NUMERIC(11),
+            stat_remained       NUMERIC(11),
             stat_regdate        TIMESTAMP default now() NOT NULL,
 			CONSTRAINT pk_em_statistics_m PRIMARY KEY (stat_date, stat_servicetype, stat_payment_code, stat_carrier)
 		) ';

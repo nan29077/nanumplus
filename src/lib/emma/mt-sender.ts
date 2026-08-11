@@ -1,95 +1,56 @@
 /**
  * EMMA MT (Mobile Terminated) sender module
  *
- * Inserts a record into em_mt_log_YYYYMM so EMMA agent picks it up and sends SMS.
+ * EMMA 에이전트가 실제로 폴링·발송하는 큐 테이블은 em_smt_tran이다.
+ * (em_mt_log_YYYYMM은 EMMA가 읽지 않는 자체 로그 테이블이었음 — 발송 안 됨)
  *
- * em_mt_log_YYYYMM columns:
- *   mt_key        VARCHAR(50)  PK
- *   service_type  CHAR(2)
- *   emma_id       CHAR(2)      -- first 2 chars of EMMA_ID env var (e.g. "na" from "nanum")
- *   mt_recipient  VARCHAR(32)  -- recipient phone (donor)
- *   mt_originator VARCHAR(32)  -- sender phone (registered number, 07041582540)
- *   msg_type      CHAR(1)      -- '1'=SMS
- *   content       VARCHAR(4000)
- *   mt_status     CHAR(1)      -- '3'=pending
- *   date_mt       TIMESTAMP
- *   date_mt_send  TIMESTAMP
- *   callback      VARCHAR(32)
+ * em_smt_tran 주요 컬럼 (인포뱅크 EMMA 3.7 표준):
+ *   mt_pr           NUMERIC(11) PK  -- sq_em_smt_tran_01 시퀀스
+ *   date_client_req TIMESTAMP       -- 클라이언트 요청 시각
+ *   content         VARCHAR(4000)   -- 문자 내용
+ *   callback        VARCHAR(25)     -- 발신번호 (회신번호)
+ *   service_type    CHAR(2)         -- '0' = SMS
+ *   broadcast_yn    CHAR(1)         -- 'N'
+ *   msg_status      CHAR(1)         -- '1' = 발송 대기 (EMMA가 픽업)
+ *   recipient_num   VARCHAR(25)     -- 수신자 번호
+ *   emma_id         CHAR(2)
+ *
+ * 발송 결과는 EMMA가 msg_status/mt_report_code_ib를 갱신하고
+ * 월별 em_smt_log_YYYYMM으로 이관한다.
  */
 
-import { randomUUID } from "crypto";
-import { getEmmaClient, getEmmaSuffix } from "./client";
+import { getEmmaClient } from "./client";
 import type { EmmaMtSendRequest, EmmaMtSendResult } from "./types";
 
-/** Register MT in EMMA queue table so EMMA agent sends the SMS */
+/** EMMA 발송 큐(em_smt_tran)에 MT 등록 — EMMA 에이전트가 픽업해 발송 */
 export async function sendEmmaMt(
   req: EmmaMtSendRequest
 ): Promise<EmmaMtSendResult> {
-  // EMMA_ID = "nanum" -> use first 2 chars "na" for CHAR(2) DB field
+  // EMMA_ID = "nanum" -> CHAR(2) 필드에는 앞 2자리 "na"만 기록
   const emmaIdFull = process.env.EMMA_ID ?? "  ";
   const emmaId = emmaIdFull.substring(0, 2).padEnd(2, " ");
-
-  const suffix = getEmmaSuffix();
-  const table = `em_mt_log_${suffix}`;
-  const mtKey = `MT-${randomUUID().replace(/-/g, "").substring(0, 32)}`;
-  const now = new Date();
 
   const client = getEmmaClient();
 
   try {
-    await ensureMtTable(suffix);
-
-    await client.$queryRawUnsafe(
-      `INSERT INTO ${table} (
-        mt_key, service_type, emma_id,
-        mt_recipient, mt_originator, msg_type,
-        content, mt_status, date_mt, date_mt_send, callback
+    const rows = await client.$queryRawUnsafe<[{ mt_pr: unknown }]>(
+      `INSERT INTO em_smt_tran (
+        mt_pr, date_client_req, content, callback,
+        service_type, broadcast_yn, msg_status, recipient_num, emma_id
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
-      )`,
-      mtKey,
-      "MO",
-      emmaId,
-      req.recipientPhone,
-      req.senderPhone,
-      "1",
+        nextval('sq_em_smt_tran_01'), NOW(), $1, $2, '0', 'N', '1', $3, $4
+      ) RETURNING mt_pr`,
       req.content,
-      "3",
-      now,
-      now,
-      req.senderPhone
+      req.senderPhone,
+      req.recipientPhone,
+      emmaId
     );
 
+    const mtKey = `SMT-${String(rows[0]?.mt_pr ?? "")}`;
     return { mtKey, status: "QUEUED" };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[emma-mt] MT queue insert failed:", message);
-    return { mtKey, status: "ERROR", message };
+    return { mtKey: "", status: "ERROR", message };
   }
-}
-
-/** Create em_mt_log_YYYYMM table if it does not exist */
-async function ensureMtTable(suffix: string): Promise<void> {
-  const client = getEmmaClient();
-  const table = `em_mt_log_${suffix}`;
-
-  await client.$queryRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS ${table} (
-      mt_key        VARCHAR(50)  NOT NULL,
-      service_type  CHAR(2)      NOT NULL DEFAULT 'MO',
-      emma_id       CHAR(2)      NOT NULL DEFAULT '  ',
-      mt_recipient  VARCHAR(32)  NOT NULL,
-      mt_originator VARCHAR(32)  NOT NULL,
-      msg_type      CHAR(1)      NOT NULL DEFAULT '1',
-      content       VARCHAR(4000),
-      mt_status     CHAR(1)      NOT NULL DEFAULT '3',
-      date_mt       TIMESTAMP    NOT NULL DEFAULT now(),
-      date_mt_send  TIMESTAMP    NOT NULL DEFAULT now(),
-      callback      VARCHAR(32),
-      result_code   VARCHAR(10),
-      result_msg    VARCHAR(200),
-      date_mt_result TIMESTAMP,
-      CONSTRAINT pk_${table} PRIMARY KEY (mt_key)
-    )
-  `);
 }
