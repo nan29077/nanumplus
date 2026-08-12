@@ -4,6 +4,7 @@ import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { OrgSettingsForm } from "@/components/org/org-settings-form";
+import { OrgPasswordForm } from "@/components/org/org-password-form";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,8 @@ export default async function OrgSettingsPage() {
           bankHolder: org?.bankHolder ?? "",
         }}
       />
+
+      <OrgPasswordForm />
     </OrgLayout>
   );
 }

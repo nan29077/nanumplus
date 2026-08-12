@@ -59,8 +59,15 @@ export function QRCodeCard({
             <img src={img} alt={`${orgName} 후원 QR 코드`}
               className="h-48 w-48 rounded-2xl border border-stone-100" />
           ) : (
-            <div className="grid h-48 w-48 place-items-center rounded-2xl border border-dashed border-stone-300 text-sm text-stone-400">
-              QR 미발급
+            <div className="grid h-48 w-48 place-items-center rounded-2xl border border-dashed border-stone-300 px-4 text-center">
+              <div>
+                <p className="text-sm font-medium text-stone-500">QR코드 미등록</p>
+                <p className="mt-1 text-xs text-stone-400">
+                  {regenerateEndpoint
+                    ? "아래 재발급 버튼을 눌러 QR 코드를 생성해 주세요."
+                    : "최고 관리자에게 QR 코드 발급을 요청해 주세요."}
+                </p>
+              </div>
             </div>
           )}
         </div>

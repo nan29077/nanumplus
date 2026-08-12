@@ -104,6 +104,8 @@ export function OrgFeeClient({
             </div>
             <div className="flex items-center gap-2">
               <div className="relative flex items-center">
+                {/* pr-8로 오른쪽 % 기호 자리를 비워 입력값과 겹치지 않게 하고,
+                    스핀 버튼을 숨겨 % 기호를 가리지 않도록 한다. */}
                 <input
                   type="number"
                   min="0"
@@ -111,9 +113,9 @@ export function OrgFeeClient({
                   step="0.1"
                   value={f.feePercent}
                   onChange={(e) => update(f.channel, e.target.value)}
-                  className="w-20 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-right text-sm font-medium text-stone-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                  className="w-24 rounded-lg border border-stone-200 bg-white py-1.5 pl-3 pr-8 text-right text-sm font-medium text-stone-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
-                <span className="absolute right-3 text-sm text-stone-400 pointer-events-none">
+                <span className="pointer-events-none absolute right-3 text-sm text-stone-400">
                   %
                 </span>
               </div>

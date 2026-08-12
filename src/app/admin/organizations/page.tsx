@@ -1,13 +1,10 @@
 import Link from "next/link";
-import Image from "next/image";
-import { Plus, Building2, ChevronRight } from "lucide-react";
+import { Plus } from "lucide-react";
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { formatKRW } from "@/lib/utils";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
-import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
+import { OrgListClient, type OrgListItem } from "@/components/admin/org-list-client";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +23,10 @@ export default async function AdminOrganizationsPage() {
         slug: true,
         logoUrl: true,
         smsFullNumber: true,
+        phone: true,
         isActive: true,
+        // 검색용 로그인 ID(기관 관리자 이메일)
+        admins: { select: { user: { select: { email: true } } }, take: 1 },
         _count: { select: { donors: true, campaigns: true } },
       },
     }),
@@ -43,6 +43,20 @@ export default async function AdminOrganizationsPage() {
       .map((g) => [g.organizationId, g._sum.amount ?? 0])
   );
 
+  const items: OrgListItem[] = orgs.map((o) => ({
+    id: o.id,
+    name: o.name,
+    slug: o.slug,
+    logoUrl: o.logoUrl,
+    smsFullNumber: o.smsFullNumber,
+    phone: o.phone,
+    loginId: o.admins[0]?.user.email ?? null,
+    isActive: o.isActive,
+    donorCount: o._count.donors,
+    campaignCount: o._count.campaigns,
+    total: totalByOrg.get(o.id) ?? 0,
+  }));
+
   return (
     <AdminLayout userName={user.name}>
       <PageHeader
@@ -56,60 +70,7 @@ export default async function AdminOrganizationsPage() {
         }
       />
 
-      {orgs.length === 0 ? (
-        <EmptyState title="등록된 기관이 없습니다" description="기관 등록 버튼으로 첫 기관을 추가해 보세요." />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {orgs.map((o) => {
-            const total = totalByOrg.get(o.id) ?? 0;
-            return (
-              <Link key={o.id} href={`/admin/organizations/${o.id}`}
-                className="group rounded-2xl border border-stone-200 bg-white p-5 shadow-card transition hover:border-brand-300 hover:shadow-lg">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="relative grid h-11 w-11 place-items-center overflow-hidden rounded-xl bg-brand-50 text-brand-600">
-                      {o.logoUrl ? (
-                        <Image src={o.logoUrl} alt="" fill unoptimized className="object-cover" />
-                      ) : (
-                        <Building2 className="h-5 w-5" strokeWidth={1.75} />
-                      )}
-                    </span>
-                    <div>
-                      <p className="font-semibold text-stone-900">{o.name}</p>
-                      <p className="text-xs text-stone-400">/{o.slug}</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-stone-300 group-hover:text-brand-500" strokeWidth={1.75} />
-                </div>
-
-                <div className="mt-4 flex items-center gap-2">
-                  {o.smsFullNumber ? (
-                    <Badge tone="blue">{o.smsFullNumber}</Badge>
-                  ) : (
-                    <Badge tone="gray">문자번호 미부여</Badge>
-                  )}
-                  {o.isActive ? <Badge tone="green">운영 중</Badge> : <Badge tone="red">비활성</Badge>}
-                </div>
-
-                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-stone-100 pt-3 text-center">
-                  <div>
-                    <p className="text-xs text-stone-400">누적 모금</p>
-                    <p className="mt-0.5 text-sm font-semibold text-brand-700">{formatKRW(total)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-stone-400">후원자</p>
-                    <p className="mt-0.5 text-sm font-semibold text-stone-800">{o._count.donors}명</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-stone-400">캠페인</p>
-                    <p className="mt-0.5 text-sm font-semibold text-stone-800">{o._count.campaigns}개</p>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <OrgListClient orgs={items} />
     </AdminLayout>
   );
 }

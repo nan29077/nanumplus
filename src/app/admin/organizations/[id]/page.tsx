@@ -5,7 +5,7 @@ import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { formatKRW } from "@/lib/utils";
 import { fmtKst } from "@/lib/kst-date";
-import { donatePageUrl } from "@/lib/qr";
+import { donatePageUrl, ensureOrgQrCode } from "@/lib/qr";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,13 @@ export default async function AdminOrganizationDetailPage({ params }: { params: 
   } catch {
     fees = CHANNELS.map((ch) => ({ channel: ch, feePercent: 5.0, isDefault: true }));
   }
+
+  // QR 코드: 마이그레이션으로 등록된 기관은 미발급 상태이므로 조회 시점에 즉시 발급한다.
+  const qrImageDataUrl = await ensureOrgQrCode({
+    id: org.id,
+    slug: org.slug,
+    qrCodeUrl: org.qrCodeUrl,
+  });
 
   return (
     <AdminLayout userName={user.name}>
@@ -118,7 +125,7 @@ export default async function AdminOrganizationDetailPage({ params }: { params: 
 
       <div className="mt-4">
         <QRCodeCard
-          imageDataUrl={org.qrCodeUrl}
+          imageDataUrl={qrImageDataUrl}
           targetUrl={donatePageUrl(org.slug)}
           orgName={org.name}
           regenerateEndpoint={`/api/admin/organizations/${org.id}/qr-code`}

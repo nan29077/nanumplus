@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { requireOrgAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { donatePageUrl } from "@/lib/qr";
+import { donatePageUrl, ensureOrgQrCode } from "@/lib/qr";
 import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { QRCodeCard } from "@/components/donation/qr-code-card";
@@ -12,7 +12,7 @@ export default async function OrgQrCodePage() {
   const user = await requireOrgAdmin();
   const org = await prisma.organization.findUnique({
     where: { id: user.organizationId },
-    select: { name: true, slug: true, qrCodeUrl: true, smsFullNumber: true },
+    select: { id: true, name: true, slug: true, qrCodeUrl: true, smsFullNumber: true },
   });
 
   // 요청 헤더에서 실제 host 추출 → QR 코드가 로컬 네트워크에서도 작동하도록
@@ -21,11 +21,16 @@ export default async function OrgQrCodePage() {
   const proto = reqHeaders.get("x-forwarded-proto") ?? "http";
   const baseUrl = `${proto}://${host}`;
 
+  // 미발급 기관은 조회 시점에 즉시 발급한다.
+  const qrImageDataUrl = org
+    ? await ensureOrgQrCode({ id: org.id, slug: org.slug, qrCodeUrl: org.qrCodeUrl })
+    : null;
+
   return (
     <OrgLayout userName={user.name} orgName={org?.name ?? "기관"}>
       <PageHeader title="QR 코드" description="후원 페이지로 연결되는 QR 코드를 내려받아 홍보물에 활용하세요." />
       <QRCodeCard
-        imageDataUrl={org?.qrCodeUrl ?? null}
+        imageDataUrl={qrImageDataUrl}
         targetUrl={donatePageUrl(org?.slug ?? "", baseUrl)}
         orgName={org?.name ?? "기관"}
         regenerateEndpoint="/api/org/qr-code/regenerate"
