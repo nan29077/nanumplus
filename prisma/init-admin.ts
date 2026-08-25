@@ -53,7 +53,7 @@ async function main() {
     where: { email: SUPER_ADMIN.email },
     update: {
       // 로그인 불가 원인(잘못된 비밀번호 / 비활성 / 소프트삭제 / 잘못된 권한)을 모두 복구
-      passwordHash: await bcrypt.hash(SUPER_ADMIN.password, 10),
+      passwordHash: await bcrypt.hash(SUPER_ADMIN.password, 12),
       role: "SUPER_ADMIN",
       isActive: true,
       deletedAt: null,
@@ -61,7 +61,7 @@ async function main() {
     create: {
       email: SUPER_ADMIN.email,
       name: SUPER_ADMIN.name,
-      passwordHash: await bcrypt.hash(SUPER_ADMIN.password, 10),
+      passwordHash: await bcrypt.hash(SUPER_ADMIN.password, 12),
       role: "SUPER_ADMIN",
       isActive: true,
     },
@@ -89,7 +89,7 @@ async function main() {
   const orgAdmin = await prisma.user.upsert({
     where: { email: ORG_ADMIN.email },
     update: {
-      passwordHash: await bcrypt.hash(ORG_ADMIN.password, 10),
+      passwordHash: await bcrypt.hash(ORG_ADMIN.password, 12),
       role: "ORG_ADMIN",
       isActive: true,
       deletedAt: null,
@@ -97,7 +97,7 @@ async function main() {
     create: {
       email: ORG_ADMIN.email,
       name: ORG_ADMIN.name,
-      passwordHash: await bcrypt.hash(ORG_ADMIN.password, 10),
+      passwordHash: await bcrypt.hash(ORG_ADMIN.password, 12),
       role: "ORG_ADMIN",
       isActive: true,
     },

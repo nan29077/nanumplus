@@ -11,7 +11,8 @@ export async function generateQrDataUrl(targetUrl: string): Promise<string> {
 }
 
 export function donatePageUrl(slug: string, base?: string) {
-  const resolvedBase = base ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  // 개발 서버 기본 포트는 3005 (package.json의 dev/start 스크립트와 동일)
+  const resolvedBase = base ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3005";
   return `${resolvedBase}/donate/${slug}`;
 }
 

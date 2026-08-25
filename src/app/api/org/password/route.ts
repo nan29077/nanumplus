@@ -71,3 +71,9 @@ export async function PATCH(req: Request) {
 
   return Response.json({ ok: true });
 }
+
+/**
+ * POST 별칭 — 클라이언트/문서에 따라 POST로 호출하는 경우를 함께 지원한다.
+ * 검증·감사 로그 등 처리 내용은 PATCH와 완전히 동일하다.
+ */
+export const POST = PATCH;

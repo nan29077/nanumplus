@@ -1,35 +1,52 @@
 /**
- * EMMA 크론 수동 실행 프록시 (SUPER_ADMIN 전용)
+ * EMMA 크론 수동 실행 (SUPER_ADMIN 전용)
  * GET /api/admin/emma-run-cron
  *
- * 브라우저에서 직접 /api/cron/emma-mo를 호출하면 EMMA_CRON_SECRET 검증을 통과할 수 없으므로
- * 서버에서 인증 헤더를 붙여 프록시한다.
+ * H-5: 이전 구현은 X-Forwarded-Host / Host 헤더로 자기 자신의 URL을 만들어
+ * /api/cron/emma-mo 를 다시 호출했다. 두 헤더 모두 클라이언트가 조작할 수 있어
+ * EMMA_CRON_SECRET이 담긴 Authorization 헤더를 임의의 외부 호스트로 보낼 수 있었다.
+ * HTTP 왕복 자체를 없애고 processEmmaMo()를 서버에서 직접 호출한다.
+ * (부수적으로 크론 시크릿 없이도 동작하며, 네트워크 왕복 비용도 사라진다)
  */
 import { NextResponse } from "next/server";
 import { apiAuth } from "@/lib/rbac";
+import { processEmmaMo } from "@/lib/emma";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
-export async function GET(req: Request) {
+export async function GET() {
   const auth = await apiAuth("SUPER_ADMIN");
   if ("error" in auth) return auth.error;
 
-  const cronSecret = process.env.EMMA_CRON_SECRET;
-  const headers: Record<string, string> = {};
-  if (cronSecret) {
-    headers["Authorization"] = `Bearer ${cronSecret}`;
+  // 크론 엔드포인트와 동일한 활성화 조건
+  const emmaId = process.env.EMMA_ID;
+  const provider = process.env.INFOBANK_PROVIDER;
+  if (provider !== "live" || !emmaId) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: "EMMA 비활성 (INFOBANK_PROVIDER=live, EMMA_ID 설정 필요)",
+    });
   }
 
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "localhost:3005";
-  const proto = req.headers.get("x-forwarded-proto") ?? "http";
-  const cronUrl = `${proto}://${host}/api/cron/emma-mo`;
-
+  const startAt = Date.now();
   try {
-    const res = await fetch(cronUrl, { method: "GET", headers });
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const result = await processEmmaMo();
+    return NextResponse.json({
+      ok: true,
+      elapsed_ms: Date.now() - startAt,
+      processed: result.processed,
+      skipped: result.skipped,
+      errors: result.errors,
+      details: result.details,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    console.error("[admin/emma-run-cron] 처리 오류:", err);
+    return NextResponse.json(
+      { ok: false, error: message, elapsed_ms: Date.now() - startAt },
+      { status: 500 }
+    );
   }
 }

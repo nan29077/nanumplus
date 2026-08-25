@@ -41,7 +41,10 @@ export async function getDashboardStats(scope: Scope) {
     donorCount,
     smsAmount: channelSum("SMS"),
     easyTransferAmount: channelSum("EASY_TRANSFER"),
-    recurringAmount: channelSum("RECURRING_TRANSFER"),
+    // M-5: 카드 정기후원(RECURRING_CARD)이 어느 지표에도 잡히지 않아 대시보드 합계가 어긋났다.
+    recurringAmount: channelSum("RECURRING_TRANSFER") + channelSum("RECURRING_CARD"),
+    recurringTransferAmount: channelSum("RECURRING_TRANSFER"),
+    recurringCardAmount: channelSum("RECURRING_CARD"),
     activeCampaigns,
   };
 }

@@ -6,13 +6,15 @@ import { Percent, Save, Info } from "lucide-react";
 const CHANNEL_LABELS: Record<string, string> = {
   SMS: "문자후원 (SMS)",
   EASY_TRANSFER: "간편 계좌이체",
-  RECURRING_TRANSFER: "정기후원",
+  RECURRING_TRANSFER: "정기후원 (계좌)",
+  RECURRING_CARD: "정기후원 (카드)",
 };
 
 const CHANNEL_DESC: Record<string, string> = {
   SMS: "1건당 3,000원 고정",
   EASY_TRANSFER: "후원자 자유 금액",
   RECURRING_TRANSFER: "매월 자동이체",
+  RECURRING_CARD: "카드 빌링키 자동결제",
 };
 
 type FeeRow = {
@@ -141,7 +143,8 @@ export function OrgFeeClient({
           <span className="font-semibold text-stone-600">
             SMS {fees.find((f) => f.channel === "SMS")?.feePercent ?? 5}% ·
             간편이체 {fees.find((f) => f.channel === "EASY_TRANSFER")?.feePercent ?? 5}% ·
-            정기 {fees.find((f) => f.channel === "RECURRING_TRANSFER")?.feePercent ?? 5}%
+            정기(계좌) {fees.find((f) => f.channel === "RECURRING_TRANSFER")?.feePercent ?? 5}% ·
+            정기(카드) {fees.find((f) => f.channel === "RECURRING_CARD")?.feePercent ?? 5}%
           </span>
         </p>
         <button

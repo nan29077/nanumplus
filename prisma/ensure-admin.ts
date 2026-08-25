@@ -18,7 +18,7 @@ async function main() {
     data: {
       name: "나눔플러스 최고관리자",
       email: "admin@onjung.kr",
-      passwordHash: await bcrypt.hash("admin1234", 10),
+      passwordHash: await bcrypt.hash("admin1234", 12),
       role: "SUPER_ADMIN",
     },
   });

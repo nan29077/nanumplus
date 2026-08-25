@@ -44,6 +44,9 @@ Thumbs.db
 EMMA V.3 for Java/
 EMMA_unix_3_7_1/
 TalkFile_nanumplus_dump.sql
+*dump.sql
+*_dump.sql
+nanumplus_dump.sql
 emma-mo-keys-*.csv
 
 # Claude 작업 중 원본 백업 (커밋 제외)

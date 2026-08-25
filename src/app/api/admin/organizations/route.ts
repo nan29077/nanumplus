@@ -79,7 +79,7 @@ export async function POST(req: Request) {
     if (codeDup) return Response.json({ error: "이미 부여된 문자후원 코드입니다." }, { status: 409 });
   }
 
-  const passwordHash = await bcrypt.hash(d.adminPassword, 10);
+  const passwordHash = await bcrypt.hash(d.adminPassword, 12);
 
   const org = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const created = await tx.organization.create({

@@ -83,7 +83,7 @@ async function main() {
     create: {
       name: "나눔플러스 최고관리자",
       email: "admin@onjung.kr",
-      passwordHash: await bcrypt.hash("admin1234", 10),
+      passwordHash: await bcrypt.hash("admin1234", 12),
       role: "SUPER_ADMIN",
     },
   });
@@ -160,7 +160,7 @@ async function main() {
       update: {},
       create: {
         name: def.admin.name, email: def.admin.email,
-        passwordHash: await bcrypt.hash("org1234", 10), role: "ORG_ADMIN",
+        passwordHash: await bcrypt.hash("org1234", 12), role: "ORG_ADMIN",
       },
     });
 

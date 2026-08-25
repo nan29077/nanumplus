@@ -167,79 +167,131 @@ export async function generateSettlements(organizationId?: string) {
   let updated = 0;
 
   for (const g of groups.values()) {
-    const total = g.items.reduce((s, i) => s + i.amount, 0);
-    const fee = g.items.reduce((s, i) => s + i.feeAmount, 0);
-    const net = total - fee;
-
-    const existing = await prisma.settlement.findUnique({
-      where: {
-        organizationId_scheduledDate: {
-          organizationId: g.organizationId,
-          scheduledDate: g.scheduledDate,
-        },
-      },
+    // 이미 다른 정산에 연결된 후원 건 제외 (빈 정산 레코드가 만들어지지 않도록 먼저 확인)
+    const linked = await prisma.settlementItem.findMany({
+      where: { donationId: { in: g.items.map((i) => i.donationId) } },
+      select: { donationId: true },
     });
+    const linkedIds = new Set(linked.map((i) => i.donationId));
+    const newItems = g.items.filter((i) => !linkedIds.has(i.donationId));
+    if (newItems.length === 0) continue;
 
-    if (!existing) {
-      await prisma.$transaction(async (tx) => {
-        await tx.settlement.create({
-          data: {
-            organizationId: g.organizationId,
-            period: g.period,
-            scheduledDate: g.scheduledDate,
-            totalAmount: total,
-            feeAmount: fee,
-            netAmount: net,
-            bankName: g.bankName,
-            bankAccount: g.bankAccount,
-            bankHolder: g.bankHolder,
-            items: {
-              create: g.items.map((i) => ({
-                donationId: i.donationId,
-                amount: i.amount,
-                channel: i.channel,
-                donatedAt: i.donatedAt,
-              })),
-            },
-          },
-        });
-      });
-      created++;
-    } else {
-      const linked = await prisma.settlementItem.findMany({
-        where: { donationId: { in: g.items.map((i) => i.donationId) } },
-        select: { donationId: true },
-      });
-      const linkedIds = new Set(linked.map((i) => i.donationId));
-      const newItems = g.items.filter((i) => !linkedIds.has(i.donationId));
-      if (newItems.length === 0) continue;
-
-      const addTotal = newItems.reduce((s, i) => s + i.amount, 0);
-      const addFee = newItems.reduce((s, i) => s + i.feeAmount, 0);
-      const addNet = addTotal - addFee;
-
-      await prisma.$transaction([
-        prisma.settlementItem.createMany({
-          data: newItems.map((i) => ({
-            settlementId: existing.id,
-            donationId: i.donationId,
-            amount: i.amount,
-            channel: i.channel,
-            donatedAt: i.donatedAt,
-          })),
-        }),
-        prisma.settlement.update({
-          where: { id: existing.id },
-          data: {
-            totalAmount: { increment: addTotal },
-            feeAmount: { increment: addFee },
-            netAmount: { increment: addNet },
-          },
-        }),
-      ]);
-      updated++;
+    // C-2: 이미 지급됐거나 처리 중인 정산에는 금액을 사후 가산하지 않는다.
+    //      해당 일자가 잠겨 있으면 뒤로 밀어 별도의 "차기 정산"으로 분리한다.
+    const target = await resolveOpenSettlement(g);
+    if (!target) {
+      console.warn(
+        `[settlement] 열린 정산 일자를 찾지 못해 건너뜀 (org=${g.organizationId}, date=${g.scheduledDate.toISOString()})`
+      );
+      continue;
     }
+
+    let addedCount = 0;
+    for (const i of newItems) {
+      // M-2 동시성: SettlementItem 생성(donationId unique)과 합계 가산을 한 트랜잭션으로 묶는다.
+      // 다른 프로세스가 먼저 연결했다면 P2002로 전체가 롤백되어 이중 가산이 발생하지 않는다.
+      try {
+        await prisma.$transaction([
+          prisma.settlementItem.create({
+            data: {
+              settlementId: target.id,
+              donationId: i.donationId,
+              amount: i.amount,
+              channel: i.channel,
+              donatedAt: i.donatedAt,
+            },
+          }),
+          prisma.settlement.update({
+            where: { id: target.id },
+            data: {
+              totalAmount: { increment: i.amount },
+              feeAmount: { increment: i.feeAmount },
+              netAmount: { increment: i.amount - i.feeAmount },
+            },
+          }),
+        ]);
+        addedCount++;
+      } catch (e) {
+        if ((e as { code?: string })?.code === "P2002") continue; // 동시 실행이 먼저 연결함
+        throw e;
+      }
+    }
+
+    if (addedCount === 0) {
+      // 동시 실행이 모든 건을 먼저 가져간 경우 — 방금 만든 빈 정산은 정리한다.
+      if (target.isNew) {
+        await prisma.settlement.deleteMany({ where: { id: target.id, items: { none: {} }, totalAmount: 0 } });
+      }
+      continue;
+    }
+    if (target.isNew) created++;
+    else updated++;
   }
 
   return { created, updated };
+}
+
+/** 금액을 가산할 수 있는 정산 상태 (지급 완료·처리 중에는 가산 금지) */
+const LOCKED_SETTLEMENT_STATUS = new Set(["PROCESSING", "COMPLETED", "CANCELLED"]);
+
+/** 잠긴 일자를 만났을 때 차기 정산일을 찾기 위해 뒤로 밀어보는 최대 일수 */
+const MAX_DEFER_DAYS = 60;
+
+/**
+ * 가산 가능한(PENDING) 정산 레코드를 확보한다.
+ *
+ * 1) 예정일에 정산이 없으면 금액 0으로 생성 (M-2: upsert로 동시 생성 경합 제거)
+ * 2) 있으나 PENDING 이면 그대로 사용
+ * 3) PROCESSING/COMPLETED/CANCELLED 로 잠겨 있으면 하루씩 미뤄 별도 정산으로 분리
+ */
+async function resolveOpenSettlement(g: {
+  organizationId: string;
+  scheduledDate: Date;
+  bankName: string | null;
+  bankAccount: string | null;
+  bankHolder: string | null;
+}): Promise<{ id: string; isNew: boolean } | null> {
+  for (let offset = 0; offset <= MAX_DEFER_DAYS; offset++) {
+    const scheduledDate = offset === 0 ? g.scheduledDate : addDays(g.scheduledDate, offset);
+
+    const existing = await prisma.settlement.findUnique({
+      where: {
+        organizationId_scheduledDate: { organizationId: g.organizationId, scheduledDate },
+      },
+      select: { id: true, status: true },
+    });
+
+    if (existing) {
+      if (LOCKED_SETTLEMENT_STATUS.has(existing.status)) continue; // 잠김 → 차기 일자로
+      return { id: existing.id, isNew: false };
+    }
+
+    // 동시 실행 시 한쪽만 create 되도록 upsert 사용 (update는 no-op)
+    const settlement = await prisma.settlement.upsert({
+      where: {
+        organizationId_scheduledDate: { organizationId: g.organizationId, scheduledDate },
+      },
+      update: {},
+      create: {
+        organizationId: g.organizationId,
+        period: settlementPeriod(scheduledDate),
+        scheduledDate,
+        totalAmount: 0,
+        feeAmount: 0,
+        netAmount: 0,
+        bankName: g.bankName,
+        bankAccount: g.bankAccount,
+        bankHolder: g.bankHolder,
+        ...(offset > 0
+          ? { note: `이전 정산일(${fmtKst(g.scheduledDate, "yyyy-MM-dd")})이 마감되어 분리된 차기 정산` }
+          : {}),
+      },
+      select: { id: true, status: true },
+    });
+
+    // upsert가 기존 행을 반환했을 수 있으므로 상태를 다시 확인
+    if (LOCKED_SETTLEMENT_STATUS.has(settlement.status)) continue;
+    return { id: settlement.id, isNew: true };
+  }
+  return null;
 }

@@ -40,6 +40,8 @@ export async function requireOrgAdmin(): Promise<SessionUser & { organizationId:
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role === "SUPER_ADMIN") redirect("/admin/dashboard");
+  // 화이트리스트: ORG_ADMIN 이외(DONOR 등)의 role은 기관 화면에 접근할 수 없다.
+  if (user.role !== "ORG_ADMIN") redirect("/login");
   if (!user.organizationId) redirect("/login");
   // 삭제·비활성화된 기관의 관리자는 접근 차단
   if (!(await isOrgUsable(user.organizationId))) redirect("/login?error=org_inactive");
@@ -57,10 +59,12 @@ export async function apiAuth(
   if (required === "SUPER_ADMIN" && user.role !== "SUPER_ADMIN") {
     return { error: Response.json({ error: "최고 관리자 권한이 필요합니다." }, { status: 403 }) };
   }
-  if (required === "ORG_ADMIN" && user.role === "SUPER_ADMIN") {
-    return { error: Response.json({ error: "기관 관리자 전용 API입니다." }, { status: 403 }) };
-  }
-  if (required === "ORG_ADMIN" && user.role === "ORG_ADMIN") {
+  if (required === "ORG_ADMIN") {
+    // C-1 화이트리스트 검증: role이 정확히 ORG_ADMIN이 아니면(SUPER_ADMIN·DONOR·미상)
+    // 무조건 403. 이전에는 SUPER_ADMIN만 걸러내어 DONOR 세션이 기관 API를 통과했다.
+    if (user.role !== "ORG_ADMIN") {
+      return { error: Response.json({ error: "기관 관리자 전용 API입니다." }, { status: 403 }) };
+    }
     if (!user.organizationId) {
       return { error: Response.json({ error: "소속 기관이 없습니다." }, { status: 403 }) };
     }

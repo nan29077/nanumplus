@@ -5,7 +5,7 @@ import { apiAuth } from "@/lib/rbac";
 import { writeAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/validation";
 
-const CHANNELS = ["SMS", "EASY_TRANSFER", "RECURRING_TRANSFER"] as const;
+const CHANNELS = ["SMS", "EASY_TRANSFER", "RECURRING_TRANSFER", "RECURRING_CARD"] as const;
 
 const bulkSchema = z.object({
   organizationIds: z.array(z.string().min(1)).min(1, "적용할 기관을 선택해 주세요.").max(500),

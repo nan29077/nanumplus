@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getInfobankAdapter } from "@/lib/adapters";
 import { rateLimit } from "@/lib/rate-limit";
 import { getClientIp, smsInitSchema, SMS_DONATION_AMOUNT } from "@/lib/validation";
+import { checkDonationPolicy } from "@/lib/channel-policy";
 
 /**
  * 문자후원 시작.
@@ -37,12 +38,22 @@ export async function POST(req: Request) {
       return Response.json({ error: "이 기관에는 아직 문자후원 번호가 부여되지 않았습니다." }, { status: 400 });
     }
 
+    // H-2 · H-4: 기관 채널 정책 검증 + campaignId가 해당 기관 소유인지 확인
+    // (이전에는 클라이언트가 보낸 campaignId를 그대로 저장해 타 기관 캠페인에 실적이 붙을 수 있었다)
+    const policy = await checkDonationPolicy({
+      organizationId: org.id,
+      channel: "SMS",
+      campaignId,
+    });
+    if (!policy.ok) return Response.json({ error: policy.error }, { status: policy.status });
+    const verifiedCampaignId = policy.campaignId;
+
     const adapter = getInfobankAdapter();
     const result = await adapter.initDonation({
       organizationId: org.id,
       smsFullNumber: org.smsFullNumber,
       amount: SMS_DONATION_AMOUNT,
-      campaignId: campaignId ?? undefined,
+      campaignId: verifiedCampaignId ?? undefined,
     });
     if (!result.ok) {
       return Response.json({ error: result.message }, { status: 400 });
@@ -51,7 +62,7 @@ export async function POST(req: Request) {
     await prisma.donation.create({
       data: {
         organizationId: org.id,
-        campaignId: campaignId ?? null,
+        campaignId: verifiedCampaignId,
         channel: "SMS",
         amount: SMS_DONATION_AMOUNT,
         status: "PENDING",

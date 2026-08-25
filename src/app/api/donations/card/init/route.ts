@@ -5,6 +5,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
 import { getClientIp, cardInitSchema } from "@/lib/validation";
 import { getDonorSession } from "@/lib/donor-auth";
+import { checkDonationPolicy } from "@/lib/channel-policy";
+import { findOrCreateDonor } from "@/lib/donor";
 
 /**
  * 신용카드 정기후원 신청 (핵토 빌링키).
@@ -38,14 +40,15 @@ export async function POST(req: Request) {
   });
   if (!org) return Response.json({ error: "기관을 찾을 수 없습니다." }, { status: 404 });
 
-  let campaignId: string | null = null;
-  if (data.campaignSlug) {
-    const campaign = await prisma.campaign.findFirst({
-      where: { slug: data.campaignSlug, organizationId: org.id, deletedAt: null },
-      select: { id: true },
-    });
-    campaignId = campaign?.id ?? null;
-  }
+  // H-2: 기관 채널 정책 · 캠페인 상태/기간/허용채널 서버 검증
+  // (결제창 호출 전에 검증해야 실패 시 빌링키가 낭비되지 않는다)
+  const policy = await checkDonationPolicy({
+    organizationId: org.id,
+    channel: "RECURRING_CARD",
+    campaignSlug: data.campaignSlug,
+  });
+  if (!policy.ok) return Response.json({ error: policy.error }, { status: policy.status });
+  const campaignId = policy.campaignId;
 
   const billing = getBillingAdapter();
 
@@ -76,22 +79,21 @@ export async function POST(req: Request) {
   }
 
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const donor = await tx.donor.create({
-      data: {
-        organizationId: org.id,
-        name: sanitizeText(data.donorName, 40),
-        phone: data.donorPhone || null,
-        email: data.donorEmail || null,
-        privacyConsent: true,
-        isRecurring: true,
-        donorAccountId: donorSession?.donorAccountId ?? null,
-      },
+    // H-1: 전화번호·이메일로 기존 후원자를 먼저 찾고, 없을 때만 생성
+    const donorId = await findOrCreateDonor(tx, {
+      organizationId: org.id,
+      name: sanitizeText(data.donorName, 40),
+      phone: data.donorPhone || null,
+      email: data.donorEmail || null,
+      privacyConsent: true,
+      isRecurring: true,
+      donorAccountId: donorSession?.donorAccountId ?? null,
     });
 
     const billingKey = await tx.billingKey.create({
       data: {
         organizationId: org.id,
-        donorId: donor.id,
+        donorId,
         donorAccountId: donorSession?.donorAccountId ?? null,
         provider: billing.providerName,
         billingKeyRef: issued.data.billingKeyRef,
@@ -104,7 +106,7 @@ export async function POST(req: Request) {
     await tx.recurringDonation.create({
       data: {
         organizationId: org.id,
-        donorId: donor.id,
+        donorId,
         donorAccountId: donorSession?.donorAccountId ?? null,
         amount: data.amount,
         dayOfMonth: data.dayOfMonth,
@@ -117,7 +119,7 @@ export async function POST(req: Request) {
     await tx.donation.create({
       data: {
         organizationId: org.id,
-        donorId: donor.id,
+        donorId,
         donorAccountId: donorSession?.donorAccountId ?? null,
         campaignId,
         channel: "RECURRING_CARD",

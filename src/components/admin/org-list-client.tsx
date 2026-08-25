@@ -26,7 +26,8 @@ export type OrgListItem = {
 const CHANNELS = [
   { key: "SMS", label: "문자후원 (SMS)" },
   { key: "EASY_TRANSFER", label: "간편 계좌이체" },
-  { key: "RECURRING_TRANSFER", label: "정기후원" },
+  { key: "RECURRING_TRANSFER", label: "정기후원 (계좌)" },
+  { key: "RECURRING_CARD", label: "정기후원 (카드)" },
 ] as const;
 
 const onlyDigits = (v: string) => v.replace(/[^0-9]/g, "");
@@ -42,11 +43,13 @@ export function OrgListClient({ orgs }: { orgs: OrgListItem[] }) {
     SMS: true,
     EASY_TRANSFER: true,
     RECURRING_TRANSFER: true,
+    RECURRING_CARD: true,
   });
   const [percent, setPercent] = useState<Record<string, string>>({
     SMS: "5",
     EASY_TRANSFER: "5",
     RECURRING_TRANSFER: "5",
+    RECURRING_CARD: "5",
   });
   const [saving, setSaving] = useState(false);
   const [bulkError, setBulkError] = useState("");

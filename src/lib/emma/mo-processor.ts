@@ -16,6 +16,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { SMS_DONATION_AMOUNT } from "@/lib/validation";
+import { findOrCreateDonor, ANON_SMS_DONOR_NAME } from "@/lib/donor";
 import { getEmmaClient, getEmmaSuffix, getPrevEmmaSuffix } from "./client";
 import { sendEmmaMt } from "./mt-sender";
 import {
@@ -148,32 +149,24 @@ async function claimMoForProcessing(suffix: string, moKey: string): Promise<bool
   return Number(result[0].count) > 0;
 }
 
-/** mo_originator 번호로 Donor를 찾거나 생성 */
-async function findOrCreateDonor(
+/**
+ * mo_originator 번호로 Donor를 찾거나 생성.
+ *
+ * 전화번호 정규화(+82 · 82 국가번호 → 0)는 공통 헬퍼(normalizePhone)가 담당한다.
+ * 기존 구현은 `replace(/^82/, "0")`을 숫자 정리보다 먼저 실행해
+ * "+821012345678" 처럼 기호가 앞에 붙은 국제 형식을 처리하지 못했다.
+ */
+async function findOrCreateMoDonor(
   organizationId: string,
   phone: string
 ): Promise<string> {
-  // 전화번호 정규화: 국제형식 제거 (821012345678 → 01012345678)
-  const normalizedPhone = phone
-    .replace(/^82/, "0")  // 821012345678 → 01012345678
-    .replace(/[^0-9]/g, "");
-
-  const existing = await prisma.donor.findFirst({
-    where: { organizationId, phone: normalizedPhone, deletedAt: null },
-    select: { id: true },
+  return findOrCreateDonor(prisma, {
+    organizationId,
+    name: ANON_SMS_DONOR_NAME,
+    phone,
+    privacyConsent: false,
+    storeNormalizedPhone: true,
   });
-  if (existing) return existing.id;
-
-  const created = await prisma.donor.create({
-    data: {
-      organizationId,
-      name: "문자후원자",
-      phone: normalizedPhone,
-      privacyConsent: false,
-    },
-    select: { id: true },
-  });
-  return created.id;
 }
 
 /** MT 감사 문자 발송 */
@@ -321,7 +314,7 @@ export async function processEmmaMo(): Promise<EmmaMoProcessResult> {
 
       try {
         // Donor 조회/생성
-        const donorId = await findOrCreateDonor(org.id, mo_originator);
+        const donorId = await findOrCreateMoDonor(org.id, mo_originator);
 
         // Donation 생성
         const created = await prisma.donation.create({

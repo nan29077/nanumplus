@@ -5,7 +5,7 @@ import { z } from "zod";
 import { writeAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/validation";
 
-const CHANNELS = ["SMS", "EASY_TRANSFER", "RECURRING_TRANSFER"] as const;
+const CHANNELS = ["SMS", "EASY_TRANSFER", "RECURRING_TRANSFER", "RECURRING_CARD"] as const;
 
 const feeSchema = z.object({
   fees: z.array(

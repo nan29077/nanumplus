@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOnkiAdapter } from "@/lib/adapters";
+import { syncCampaignAmountOnStatusChange } from "@/services/campaign-amount";
 
 /**
  * 온기 결제 결과 웹훅 (Mock).
@@ -51,21 +52,10 @@ export async function POST(req: Request) {
             data: { status: next },
           });
 
-          if (donation.campaignId && updated.count > 0) {
-            // PENDING/FAILED → COMPLETED: 모금액 가산
-            if (donation.status !== "COMPLETED" && next === "COMPLETED") {
-              await tx.campaign.update({
-                where: { id: donation.campaignId },
-                data: { currentAmount: { increment: donation.amount } },
-              });
-            }
-            // C-4 환불 처리: COMPLETED → REFUNDED 시 모금액 차감
-            if (donation.status === "COMPLETED" && next === "REFUNDED") {
-              await tx.campaign.update({
-                where: { id: donation.campaignId },
-                data: { currentAmount: { decrement: donation.amount } },
-              });
-            }
+          // M-6: COMPLETED로 들어오면 가산, COMPLETED에서 빠져나가면(FAILED·REFUNDED 등) 차감.
+          //      이전에는 REFUNDED만 되돌려 FAILED 전환 시 모금액이 부풀려진 채 남았다.
+          if (updated.count > 0) {
+            await syncCampaignAmountOnStatusChange(tx, donation, next);
           }
         });
       }
