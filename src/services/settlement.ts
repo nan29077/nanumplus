@@ -1,35 +1,70 @@
-import { addMonths, setDate } from "date-fns";
+import { addMonths, addDays, setDate, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { prisma } from "@/lib/prisma";
 import { KST, kstToUtc, fmtKst } from "@/lib/kst-date";
 
-/**
- * 후원 채널에 따른 정산 예정일 계산 (KST 기준)
- * - SMS: 후원일 + 3개월 후 16일
- * - EASY_TRANSFER / RECURRING_TRANSFER: 다음달 16일
- * 월/일 계산을 KST 벽시계 기준으로 수행한 뒤 UTC로 변환해 저장한다.
- */
-export function calcSettlementDate(channel: string, donatedAt: Date): Date {
-  const kst = toZonedTime(donatedAt, KST);
-  const base = channel === "SMS" ? addMonths(kst, 3) : addMonths(kst, 1);
-  return kstToUtc(setDate(base, 16));
+/** 채널별 정산 규칙 (플랫폼 전역) */
+export type SettlementRuleValue = {
+  ruleType: "DAYS" | "MONTHS";
+  offsetValue: number;
+  anchorDay: number | null;
+};
+
+/** 기본 규칙 (관리자가 미설정한 채널 / 마이그레이션 전 폴백) — 기존 동작과 동일 */
+export const DEFAULT_SETTLEMENT_RULES: Record<string, SettlementRuleValue> = {
+  SMS: { ruleType: "MONTHS", offsetValue: 3, anchorDay: 16 },
+  EASY_TRANSFER: { ruleType: "MONTHS", offsetValue: 1, anchorDay: 16 },
+  RECURRING_TRANSFER: { ruleType: "MONTHS", offsetValue: 1, anchorDay: 16 },
+  RECURRING_CARD: { ruleType: "MONTHS", offsetValue: 1, anchorDay: 16 },
+};
+
+/** DB의 채널별 규칙을 기본값과 병합해 로드 */
+export async function loadSettlementRules(): Promise<Map<string, SettlementRuleValue>> {
+  const map = new Map<string, SettlementRuleValue>(Object.entries(DEFAULT_SETTLEMENT_RULES));
+  try {
+    const rows = await prisma.settlementRule.findMany();
+    for (const r of rows) {
+      map.set(r.channel, {
+        ruleType: r.ruleType as "DAYS" | "MONTHS",
+        offsetValue: r.offsetValue,
+        anchorDay: r.anchorDay ?? null,
+      });
+    }
+  } catch {
+    // 마이그레이션 전: 기본값 사용
+  }
+  return map;
 }
 
 /**
- * 정산 기간 레이블: "2026-04" 형식 (KST 기준)
+ * 규칙에 따른 정산 예정일 계산 (KST 기준, 자정으로 정규화)
+ * - DAYS:  후원일 + offsetValue 일
+ * - MONTHS: offsetValue 개월 후 anchorDay 일 (1~28)
+ * KST 벽시계로 계산 후 UTC로 변환. 같은 날짜는 동일 인스턴트가 되어 그룹핑에 사용된다.
  */
+export function calcSettlementDate(rule: SettlementRuleValue, donatedAt: Date): Date {
+  const kst = toZonedTime(donatedAt, KST);
+  let d: Date;
+  if (rule.ruleType === "DAYS") {
+    d = startOfDay(addDays(kst, Math.max(0, rule.offsetValue)));
+  } else {
+    const base = addMonths(kst, Math.max(0, rule.offsetValue));
+    const day = Math.min(Math.max(rule.anchorDay ?? 16, 1), 28);
+    d = startOfDay(setDate(base, day));
+  }
+  return kstToUtc(d);
+}
+
+/** 정산 기간 레이블: "2026-04" (KST 기준, 예정일의 월) */
 export function settlementPeriod(date: Date): string {
   return fmtKst(date, "yyyy-MM");
 }
 
 /**
  * 기관별 채널별 수수료율 맵 반환 (기본값 5%)
- * Map<organizationId, Map<channel, feePercent>>
  */
 async function loadFeeMap(organizationIds: string[]): Promise<Map<string, Map<string, number>>> {
   if (organizationIds.length === 0) return new Map();
-
-  // MI-1: (prisma as any) 캐스팅 제거 — OrganizationFee가 이미 prisma 클라이언트에 포함됨
   let fees: { organizationId: string; channel: string; feePercent: number }[] = [];
   try {
     fees = await prisma.organizationFee.findMany({
@@ -37,9 +72,8 @@ async function loadFeeMap(organizationIds: string[]): Promise<Map<string, Map<st
       select: { organizationId: true, channel: true, feePercent: true },
     });
   } catch {
-    // 마이그레이션 전이라면 빈 배열 → 기본 5% 적용
+    // 마이그레이션 전이면 빈 배열 → 기본 5%
   }
-
   const map = new Map<string, Map<string, number>>();
   for (const f of fees) {
     if (!map.has(f.organizationId)) map.set(f.organizationId, new Map());
@@ -48,7 +82,6 @@ async function loadFeeMap(organizationIds: string[]): Promise<Map<string, Map<st
   return map;
 }
 
-/** 채널 수수료율 조회 (없으면 기본 5%) */
 function getFeePercent(
   feeMap: Map<string, Map<string, number>>,
   organizationId: string,
@@ -59,18 +92,15 @@ function getFeePercent(
 
 /**
  * 미처리 후원 건에 대해 정산 데이터 생성/갱신
- * - COMPLETED 상태의 후원 건 중 아직 SettlementItem이 없는 것들을 처리
- * - organizationId를 지정하면 해당 기관만, null이면 전체
- * - 채널별 수수료율은 OrganizationFee 테이블에서 읽음 (없으면 5%)
+ * - COMPLETED · 아직 SettlementItem 없는 건 처리
+ * - 채널별 정산규칙으로 정산예정일 계산 → (기관, 정산예정일) 단위로 묶음
  */
 export async function generateSettlements(organizationId?: string) {
-  // 아직 정산 항목이 없는 완료된 후원 조회
   const donations = await prisma.donation.findMany({
     where: {
       status: "COMPLETED",
       deletedAt: null,
       settlementItems: { none: {} },
-      // 기관 미배정(organizationId=null) 후원은 정산 대상에서 제외
       organizationId: { not: null },
       ...(organizationId ? { organizationId } : {}),
     },
@@ -84,12 +114,10 @@ export async function generateSettlements(organizationId?: string) {
 
   if (donations.length === 0) return { created: 0, updated: 0 };
 
-  // 기관 ID 목록 수집 후 수수료 맵 로드
   const orgIds = [...new Set(donations.map((d) => d.organizationId).filter((id): id is string => id !== null))];
-  const feeMap = await loadFeeMap(orgIds);
+  const [feeMap, rules] = await Promise.all([loadFeeMap(orgIds), loadSettlementRules()]);
 
-  // 기관 + 기간 별로 그루핑
-  type GroupKey = string; // `${organizationId}::${period}`
+  type GroupKey = string; // `${organizationId}::${scheduledDate ISO}`
   const groups = new Map<
     GroupKey,
     {
@@ -104,12 +132,12 @@ export async function generateSettlements(organizationId?: string) {
   >();
 
   for (const d of donations) {
-    // where 절에서 organizationId: { not: null } 로 걸러지지만 타입 안전을 위해 재확인
     if (!d.organizationId) continue;
 
-    const settled = calcSettlementDate(d.channel, d.donatedAt);
+    const rule = rules.get(d.channel) ?? DEFAULT_SETTLEMENT_RULES[d.channel] ?? DEFAULT_SETTLEMENT_RULES.EASY_TRANSFER;
+    const settled = calcSettlementDate(rule, d.donatedAt);
     const period = settlementPeriod(settled);
-    const key: GroupKey = `${d.organizationId}::${period}`;
+    const key: GroupKey = `${d.organizationId}::${settled.toISOString()}`;
 
     if (!groups.has(key)) {
       groups.set(key, {
@@ -124,7 +152,7 @@ export async function generateSettlements(organizationId?: string) {
     }
 
     const feePercent = getFeePercent(feeMap, d.organizationId, d.channel);
-    const donationFee = Math.round(d.amount * feePercent / 100);
+    const donationFee = Math.round((d.amount * feePercent) / 100);
 
     groups.get(key)!.items.push({
       donationId: d.id,
@@ -144,13 +172,15 @@ export async function generateSettlements(organizationId?: string) {
     const net = total - fee;
 
     const existing = await prisma.settlement.findUnique({
-      where: { organizationId_period: { organizationId: g.organizationId, period: g.period } },
+      where: {
+        organizationId_scheduledDate: {
+          organizationId: g.organizationId,
+          scheduledDate: g.scheduledDate,
+        },
+      },
     });
 
     if (!existing) {
-      // M-6: 정산 레코드 + 항목을 명시적 트랜잭션으로 묶어 원자성 보장.
-      // Prisma nested create는 내부적으로 트랜잭션이지만,
-      // 향후 금액 계산 로직 추가 시에도 안전하게 확장 가능하도록 명시한다.
       await prisma.$transaction(async (tx) => {
         await tx.settlement.create({
           data: {
@@ -176,9 +206,6 @@ export async function generateSettlements(organizationId?: string) {
       });
       created++;
     } else {
-      // 기존 정산에 새 항목 추가.
-      // 이미 정산 항목이 존재하는 후원 건은 사전에 제외하고,
-      // 실제로 추가되는 항목만으로 금액을 재계산한다.
       const linked = await prisma.settlementItem.findMany({
         where: { donationId: { in: g.items.map((i) => i.donationId) } },
         select: { donationId: true },
@@ -191,9 +218,6 @@ export async function generateSettlements(organizationId?: string) {
       const addFee = newItems.reduce((s, i) => s + i.feeAmount, 0);
       const addNet = addTotal - addFee;
 
-      // 항목 삽입과 금액 갱신을 하나의 트랜잭션으로 원자 처리.
-      // skipDuplicates를 쓰지 않으므로 동시 실행으로 중복이 발생하면
-      // 트랜잭션 전체가 롤백되어 금액 불일치가 생기지 않는다.
       await prisma.$transaction([
         prisma.settlementItem.createMany({
           data: newItems.map((i) => ({

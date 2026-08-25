@@ -373,7 +373,8 @@ model Settlement {
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   items        SettlementItem[]
 
-  @@unique([organizationId, period])
+  @@unique([organizationId, scheduledDate])
+  @@index([organizationId, period])
   @@index([organizationId])
   @@index([scheduledDate])
   @@index([status])
@@ -497,4 +498,21 @@ model BillingKey {
   @@index([organizationId])
   @@index([donorAccountId])
   @@index([donorId])
+}
+
+// ───────────────────────── 정산주기 규칙 (채널별, 플랫폼 전역) ─────────────────────────
+
+enum SettlementRuleType {
+  DAYS   // 후원일 + offsetValue 일 후
+  MONTHS // offsetValue 개월 후, anchorDay 일
+}
+
+model SettlementRule {
+  id          String             @id @default(cuid())
+  channel     DonationChannel    @unique
+  ruleType    SettlementRuleType @default(MONTHS)
+  offsetValue Int                @default(1) // DAYS: 일수 / MONTHS: 개월수
+  anchorDay   Int?               // MONTHS 전용: 정산일(1~28). DAYS 에선 무시
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 }

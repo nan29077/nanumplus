@@ -147,9 +147,16 @@ export default async function AdminSettlementsPage({
 
   return (
     <AdminLayout userName={user.name}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="text-sm text-stone-500">기관별 후원금 정산을 처리합니다. 채널별 정산주기는 설정에서 변경할 수 있습니다.</p>
+        <a href="/admin/settlements/rules"
+          className="shrink-0 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
+          정산주기 설정
+        </a>
+      </div>
       <PageHeader
         title="정산 관리"
-        description="기관별 후원금 정산을 처리합니다. SMS 후원 +3개월 16일, 나머지 다음달 16일 정산."
+        description="후원 채널별 설정된 정산주기에 따라 정산 예정일이 계산됩니다."
       />
 
       {migrationNeeded ? (
