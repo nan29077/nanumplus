@@ -100,6 +100,7 @@ export async function getChannelBreakdown(scope: Scope, period?: PeriodKey) {
     SMS: "문자후원",
     EASY_TRANSFER: "간편 계좌이체",
     RECURRING_TRANSFER: "정기후원",
+    RECURRING_CARD: "카드 정기후원",
   };
   return rows.map((r) => ({
     channel: r.channel,

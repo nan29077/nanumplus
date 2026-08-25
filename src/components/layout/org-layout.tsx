@@ -2,9 +2,10 @@
 
 import {
   LayoutDashboard, HandCoins, Users, MessageSquare, Landmark,
-  RefreshCw, Megaphone, CalendarDays, BarChart3, QrCode, Settings, Wallet,
+  RefreshCw, Megaphone, CalendarDays, BarChart3, QrCode, Settings, Wallet, Palette,
 } from "lucide-react";
 import { Sidebar, type NavSection } from "./sidebar";
+import { getOrganizationAvatar } from "@/lib/organization-avatar";
 
 const sections: NavSection[] = [
   { href: "/org/dashboard", label: "대시보드", icon: LayoutDashboard },
@@ -24,6 +25,7 @@ const sections: NavSection[] = [
     heading: "캠페인 / 일정",
     items: [
       { href: "/org/campaigns", label: "모금 캠페인", icon: Megaphone },
+      { href: "/org/donation-page", label: "후원페이지 설정", icon: Palette },
       { href: "/org/calendar", label: "캘린더", icon: CalendarDays },
     ],
   },
@@ -50,7 +52,13 @@ export function OrgLayout({
 }: { userName: string; orgName: string; children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-stone-50">
-      <Sidebar sections={sections} title={orgName} userName={userName} logoHref="/" />
+      <Sidebar
+        sections={sections}
+        title={orgName}
+        userName={userName}
+        logoHref="/"
+        avatarUrl={getOrganizationAvatar(orgName)}
+      />
       <main className="px-4 py-6 lg:ml-64 lg:px-8">{children}</main>
     </div>
   );

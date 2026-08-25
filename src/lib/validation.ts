@@ -18,6 +18,17 @@ export const recurringInitSchema = transferInitSchema.extend({
   dayOfMonth: z.coerce.number().int().min(1).max(28),
 });
 
+/** 신용카드 정기후원(핵토 빌링키) — 계좌 정기와 동일 + 카드 표시 메타(선택) */
+export const cardInitSchema = transferInitSchema.extend({
+  dayOfMonth: z.coerce.number().int().min(1).max(28),
+  cardIssuer: z.string().max(30).optional().or(z.literal("")),
+  cardLast4: z
+    .string()
+    .regex(/^\d{4}$/, "카드 끝 4자리를 입력해 주세요.")
+    .optional()
+    .or(z.literal("")),
+});
+
 /** SMS 문자후원은 건당 3,000원 고정 */
 export const SMS_DONATION_AMOUNT = 3_000;
 

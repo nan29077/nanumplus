@@ -7,25 +7,31 @@ import { cn } from "@/lib/utils";
 
 const slides = [
   {
-    title: "작은 후원이 만드는\n가장 따뜻한 변화",
-    desc: "문자 한 통, 계좌이체 한 번이 누군가의 하루를 바꿉니다. 지금 바로 우리 동네 사회복지기관을 후원해 보세요.",
-    cta: { label: "캠페인 둘러보기", href: "/campaigns" },
-    image: "https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=1600&auto=format&fit=crop&q=80",
-    overlay: "from-brand-900/80 via-brand-800/60 to-brand-700/20",
+    eyebrow: "나눔이 일상이 되는 곳",
+    title: "마음을 나누면,\n내일은 더 따뜻해집니다",
+    desc: "가까운 이웃을 향한 작은 마음이 한 사람의 든든한 오늘이 됩니다. 나눔플러스와 함께 따뜻한 변화를 시작해 보세요.",
+    cta: { label: "우리 동네 기관 만나기", href: "/#organizations" },
+    secondaryCta: { label: "캠페인 둘러보기", href: "/#campaigns" },
+    image: "/images/hero/nanum-community-care.jpg",
+    overlay: "from-[#302015]/95 via-[#493323]/72 to-[#493323]/10",
   },
   {
-    title: "사회복지기관을 위한\n투명한 모금 관리",
-    desc: "모든 후원 내역이 일별·월별·캘린더로 기록됩니다. 기관과 후원자가 함께 믿을 수 있는 모금 환경을 만듭니다.",
-    cta: { label: "기관 로그인", href: "/login" },
-    image: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1600&auto=format&fit=crop&q=80",
-    overlay: "from-stone-900/80 via-stone-800/60 to-stone-700/20",
+    eyebrow: "함께 키우는 좋은 변화",
+    title: "한 사람의 마음이 모여\n우리 동네의 희망이 됩니다",
+    desc: "아이부터 어르신까지, 도움이 필요한 이웃 곁을 지키는 기관들의 이야기를 만나고 응원해 주세요.",
+    cta: { label: "참여 기관 살펴보기", href: "/#organizations" },
+    secondaryCta: { label: "나눔 방법 알아보기", href: "/#sms" },
+    image: "/images/hero/nanum-growing-together.jpg",
+    overlay: "from-[#553828]/90 via-[#70513b]/55 to-transparent",
   },
   {
-    title: "문자후원과 간편 계좌이체를\n한 곳에서",
-    desc: "인포뱅크 문자후원(#2540)과 온기 간편 계좌이체·정기후원까지, 후원의 모든 방법을 하나의 플랫폼에서 관리하세요.",
-    cta: { label: "후원 방법 알아보기", href: "/#sms" },
-    image: "https://images.unsplash.com/photo-1512428559087-560fa5ceab42?w=1600&auto=format&fit=crop&q=80",
-    overlay: "from-sky-900/80 via-sky-800/60 to-sky-700/20",
+    eyebrow: "투명하게 잇는 마음",
+    title: "당신의 따뜻한 마음,\n꼭 필요한 곳에 닿도록",
+    desc: "문자후원부터 간편 계좌이체, 정기후원까지. 나눔의 모든 순간을 쉽고 투명하게 연결합니다.",
+    cta: { label: "진행 중인 캠페인", href: "/campaigns" },
+    secondaryCta: { label: "기관 로그인", href: "/login" },
+    image: "/images/hero/nanum-heart-hands.jpg",
+    overlay: "from-[#2e2118]/95 via-[#49382b]/66 to-[#49382b]/10",
   },
 ];
 
@@ -48,7 +54,7 @@ export function HeroSlider() {
         {slides.map((s, i) => (
           <div
             key={i}
-            className="relative min-w-full px-4 py-28 sm:py-40"
+            className="relative min-w-full px-4 py-24 sm:py-36 lg:py-40"
             style={{
               backgroundImage: `url(${s.image})`,
               backgroundSize: "cover",
@@ -59,19 +65,31 @@ export function HeroSlider() {
             {/* 텍스트 가독성을 위한 어두운 오버레이 */}
             <div className={cn("absolute inset-0 bg-gradient-to-r", s.overlay)} />
             <div className="relative mx-auto max-w-6xl">
+              <p className="mb-4 text-sm font-semibold tracking-[0.18em] text-amber-100 sm:text-base">
+                {s.eyebrow}
+              </p>
               <h1 className="whitespace-pre-line text-3xl font-bold leading-tight tracking-tight text-white drop-shadow-md sm:text-5xl">
                 {s.title}
               </h1>
               <p className="mt-5 max-w-xl text-base leading-relaxed text-white/90 drop-shadow sm:text-lg">
                 {s.desc}
               </p>
-              <Link
-                href={s.cta.href}
-                className="mt-8 inline-block rounded-xl bg-white px-6 py-3 text-sm font-semibold text-stone-900 shadow hover:bg-stone-100"
-                tabIndex={i === idx ? 0 : -1}
-              >
-                {s.cta.label}
-              </Link>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href={s.cta.href}
+                  className="rounded-full bg-[#f7eee1] px-6 py-3 text-sm font-semibold text-[#4b3525] shadow-lg transition hover:-translate-y-0.5 hover:bg-white"
+                  tabIndex={i === idx ? 0 : -1}
+                >
+                  {s.cta.label}
+                </Link>
+                <Link
+                  href={s.secondaryCta.href}
+                  className="rounded-full border border-white/50 bg-white/10 px-6 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
+                  tabIndex={i === idx ? 0 : -1}
+                >
+                  {s.secondaryCta.label}
+                </Link>
+              </div>
             </div>
           </div>
         ))}

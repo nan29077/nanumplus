@@ -1,9 +1,10 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getOnkiAdapter } from "@/lib/adapters";
+import { getTransferAdapter } from "@/lib/adapters";
 import { rateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
 import { getClientIp, transferInitSchema } from "@/lib/validation";
+import { getDonorSession } from "@/lib/donor-auth";
 
 /**
  * 온기 간편 계좌이체 후원.
@@ -27,6 +28,7 @@ export async function POST(req: Request) {
     return Response.json({ error: parsed.error.issues[0]?.message ?? "입력값을 확인해 주세요." }, { status: 400 });
   }
   const data = parsed.data;
+  const donorSession = await getDonorSession();
 
   const org = await prisma.organization.findFirst({
     where: { slug: parsed.data.organizationSlug, isActive: true, deletedAt: null },
@@ -42,7 +44,7 @@ export async function POST(req: Request) {
     campaignId = campaign?.id ?? null;
   }
 
-  const adapter = getOnkiAdapter();
+  const adapter = getTransferAdapter();
   const result = await adapter.initEasyTransfer({
     organizationId: org.id,
     amount: data.amount,
@@ -65,12 +67,14 @@ export async function POST(req: Request) {
         phone: data.donorPhone || null,
         email: data.donorEmail || null,
         privacyConsent: true,
+        donorAccountId: donorSession?.donorAccountId ?? null,
       },
     });
     await tx.donation.create({
       data: {
         organizationId: org.id,
         donorId: donor.id,
+        donorAccountId: donorSession?.donorAccountId ?? null,
         campaignId,
         channel: "EASY_TRANSFER",
         amount: data.amount,

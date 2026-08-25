@@ -6,6 +6,7 @@ import { formatKRW, formatNumber } from "@/lib/utils";
 import { fmtKst } from "@/lib/kst-date";
 import { PublicHeader, PublicFooter } from "@/components/layout/public-layout";
 import { DonateActions } from "@/components/donation/donate-actions";
+import { resolveDonationPage, ALL_CHANNELS, type DonationChannelKey } from "@/lib/donation-page";
 
 export const dynamic = "force-dynamic";
 
@@ -15,13 +16,26 @@ export default async function CampaignDetailPage({
   const campaign = await prisma.campaign.findUnique({
     where: { slug: params.campaignSlug },
     include: {
-      organization: true,
+      organization: { include: { donationPage: true } },
       images: { orderBy: { sortOrder: "asc" } },
       _count: { select: { donations: { where: { status: "COMPLETED" } } } },
     },
   });
   if (!campaign || !campaign.isPublished || campaign.deletedAt) notFound();
 
+  const cfg = resolveDonationPage(campaign.organization.donationPage);
+  // 캠페인이 허용 채널을 지정했으면 그것을, 아니면 기관 후원페이지 설정 채널을 사용
+  let campaignChannels: DonationChannelKey[] = cfg.enabledChannels;
+  if (campaign.allowedChannels) {
+    try {
+      const parsed = JSON.parse(campaign.allowedChannels) as unknown;
+      if (Array.isArray(parsed)) {
+        const set = new Set(ALL_CHANNELS as string[]);
+        const picked = parsed.filter((x): x is DonationChannelKey => typeof x === "string" && set.has(x));
+        if (picked.length) campaignChannels = ALL_CHANNELS.filter((c) => picked.includes(c));
+      }
+    } catch { /* keep cfg default */ }
+  }
   const pct = Math.min(100, Math.round((campaign.currentAmount / Math.max(campaign.goalAmount, 1)) * 100));
   const daysLeft = Math.max(0, Math.ceil((campaign.endDate.getTime() - Date.now()) / 86_400_000));
 
@@ -130,6 +144,9 @@ export default async function CampaignDetailPage({
           orgName={campaign.organization.name}
           smsNumber={campaign.organization.smsFullNumber}
           campaignSlug={campaign.slug}
+          enabledChannels={campaignChannels}
+          suggestedAmounts={cfg.suggestedAmounts}
+          themeColor={cfg.themeColor}
         />
       </main>
       <PublicFooter />

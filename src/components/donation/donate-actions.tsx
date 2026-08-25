@@ -1,15 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquare, Landmark, RefreshCw, CheckCircle2, Copy, X } from "lucide-react";
+import { MessageSquare, Landmark, RefreshCw, CreditCard, CheckCircle2, Copy, X } from "lucide-react";
 import { cn, formatKRW } from "@/lib/utils";
+import { CHANNEL_META, type DonationChannelKey } from "@/lib/donation-page";
 
-type Mode = null | "sms" | "transfer" | "recurring";
+type Mode = null | "sms" | "transfer" | "recurring" | "card";
+type Kind = "transfer" | "recurring" | "card";
 
-const presetAmounts = [5000, 10000, 30000, 50000];
+const DEFAULT_AMOUNTS = [10000, 30000, 50000, 100000];
+
+const CHANNEL_ICON: Record<DonationChannelKey, typeof MessageSquare> = {
+  SMS: MessageSquare,
+  EASY_TRANSFER: Landmark,
+  RECURRING_TRANSFER: RefreshCw,
+  RECURRING_CARD: CreditCard,
+};
 
 export function DonateActions({
   orgSlug, orgId, orgName, smsNumber, campaignSlug, sticky,
+  enabledChannels = ["SMS", "EASY_TRANSFER", "RECURRING_TRANSFER", "RECURRING_CARD"],
+  suggestedAmounts = DEFAULT_AMOUNTS,
+  themeColor = "#2f8f5b",
+  thankYou,
+  donor,
 }: {
   orgSlug: string;
   orgId: string;
@@ -17,33 +31,38 @@ export function DonateActions({
   smsNumber: string | null;
   campaignSlug?: string;
   sticky?: boolean;
+  enabledChannels?: DonationChannelKey[];
+  suggestedAmounts?: number[];
+  themeColor?: string;
+  thankYou?: { title?: string | null; message?: string | null };
+  donor?: { name: string; email: string | null; phone?: string | null };
 }) {
   const [mode, setMode] = useState<Mode>(null);
 
+  const openFor = (ch: DonationChannelKey) => {
+    setMode(
+      ch === "SMS" ? "sms"
+      : ch === "EASY_TRANSFER" ? "transfer"
+      : ch === "RECURRING_TRANSFER" ? "recurring"
+      : "card"
+    );
+  };
+
+  const cols = Math.min(enabledChannels.length, 4);
   const buttons = (
-    <div className={cn("grid gap-2.5", sticky ? "grid-cols-3" : "mt-5 sm:grid-cols-3")}>
-      <button
-        onClick={() => setMode("sms")}
-        className="flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3.5 text-sm font-semibold text-white hover:bg-sky-700"
-      >
-        <MessageSquare className="h-4 w-4" strokeWidth={1.75} />
-        문자후원 하기
-      </button>
-      <button
-        onClick={() => setMode("transfer")}
-        className="flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3.5 text-sm font-semibold text-white hover:bg-brand-700"
-      >
-        <Landmark className="h-4 w-4" strokeWidth={1.75} />
-        <span className={sticky ? "hidden sm:inline" : ""}>간편 계좌이체</span>
-        <span className={sticky ? "sm:hidden" : "hidden"}>계좌이체</span>
-      </button>
-      <button
-        onClick={() => setMode("recurring")}
-        className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3.5 text-sm font-semibold text-white hover:bg-amber-600"
-      >
-        <RefreshCw className="h-4 w-4" strokeWidth={1.75} />
-        정기후원
-      </button>
+    <div className={cn("grid gap-2.5", sticky ? "" : "mt-5")}
+      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+      {enabledChannels.map((ch) => {
+        const Icon = CHANNEL_ICON[ch];
+        return (
+          <button key={ch} onClick={() => openFor(ch)}
+            style={{ backgroundColor: themeColor }}
+            className="flex items-center justify-center gap-2 rounded-xl px-3 py-3.5 text-sm font-semibold text-white transition hover:brightness-95">
+            <Icon className="h-4 w-4" strokeWidth={1.75} />
+            <span className="truncate">{CHANNEL_META[ch].short}</span>
+          </button>
+        );
+      })}
     </div>
   );
 
@@ -59,17 +78,25 @@ export function DonateActions({
 
       {mode === "sms" && (
         <Modal onClose={() => setMode(null)} title="문자후원">
-          <SmsPanel smsNumber={smsNumber} orgName={orgName} orgId={orgId} />
+          <SmsPanel smsNumber={smsNumber} orgName={orgName} orgId={orgId} themeColor={themeColor} />
         </Modal>
       )}
       {mode === "transfer" && (
         <Modal onClose={() => setMode(null)} title="간편 계좌이체 후원">
-          <TransferForm orgSlug={orgSlug} campaignSlug={campaignSlug} recurring={false} />
+          <DonationForm kind="transfer" orgSlug={orgSlug} campaignSlug={campaignSlug}
+            presetAmounts={suggestedAmounts} themeColor={themeColor} thankYou={thankYou} donor={donor} />
         </Modal>
       )}
       {mode === "recurring" && (
-        <Modal onClose={() => setMode(null)} title="정기후원 신청">
-          <TransferForm orgSlug={orgSlug} campaignSlug={campaignSlug} recurring />
+        <Modal onClose={() => setMode(null)} title="정기 계좌후원 신청">
+          <DonationForm kind="recurring" orgSlug={orgSlug} campaignSlug={campaignSlug}
+            presetAmounts={suggestedAmounts} themeColor={themeColor} thankYou={thankYou} donor={donor} />
+        </Modal>
+      )}
+      {mode === "card" && (
+        <Modal onClose={() => setMode(null)} title="신용카드 정기후원">
+          <DonationForm kind="card" orgSlug={orgSlug} campaignSlug={campaignSlug}
+            presetAmounts={suggestedAmounts} themeColor={themeColor} thankYou={thankYou} donor={donor} />
         </Modal>
       )}
     </>
@@ -95,18 +122,16 @@ function Modal({ title, onClose, children }: {
   );
 }
 
-function SmsPanel({ smsNumber, orgName, orgId }: {
-  smsNumber: string | null; orgName: string; orgId: string;
+function SmsPanel({ smsNumber, orgName, orgId, themeColor }: {
+  smsNumber: string | null; orgName: string; orgId: string; themeColor: string;
 }) {
   const [copied, setCopied] = useState(false);
   if (!smsNumber) {
     return <p className="text-sm text-stone-500">이 기관에는 아직 문자후원 번호가 부여되지 않았습니다.</p>;
   }
-  // #25401234 → SMS 수신 번호 (모바일 sms: 링크용으로 # 제거)
   const smsHref = `sms:${smsNumber.replace("#", "%23")}?body=${encodeURIComponent("후원합니다")}`;
 
   const init = () => {
-    // Mock 문자후원 기록 시작 (실제 연동 시 인포뱅크가 웹훅으로 결과 통지)
     fetch("/api/donations/sms/init", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -121,7 +146,7 @@ function SmsPanel({ smsNumber, orgName, orgId }: {
         후원금은 휴대폰 요금에 합산 청구됩니다.
       </p>
       <div className="mt-4 flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-4">
-        <span className="text-xl font-bold tracking-wide text-brand-700">{smsNumber}</span>
+        <span className="text-xl font-bold tracking-wide" style={{ color: themeColor }}>{smsNumber}</span>
         <button
           onClick={() => {
             navigator.clipboard?.writeText(smsNumber);
@@ -134,10 +159,12 @@ function SmsPanel({ smsNumber, orgName, orgId }: {
           {copied ? "복사됨" : "복사"}
         </button>
       </div>
+      {/* 모바일 전용: 문자 앱 열기 (PC에서는 숨김) */}
       <a
         href={smsHref}
         onClick={init}
-        className="mt-4 block rounded-xl bg-sky-600 py-3 text-center text-sm font-semibold text-white hover:bg-sky-700 sm:hidden"
+        style={{ backgroundColor: themeColor }}
+        className="mt-4 block rounded-xl py-3 text-center text-sm font-semibold text-white hover:brightness-95 sm:hidden"
       >
         문자 앱 열기
       </a>
@@ -149,18 +176,32 @@ function SmsPanel({ smsNumber, orgName, orgId }: {
   );
 }
 
-function TransferForm({ orgSlug, campaignSlug, recurring }: {
-  orgSlug: string; campaignSlug?: string; recurring: boolean;
+function DonationForm({
+  kind, orgSlug, campaignSlug, presetAmounts, themeColor, thankYou, donor,
+}: {
+  kind: Kind;
+  orgSlug: string;
+  campaignSlug?: string;
+  presetAmounts: number[];
+  themeColor: string;
+  thankYou?: { title?: string | null; message?: string | null };
+  donor?: { name: string; email: string | null; phone?: string | null };
 }) {
-  const [amount, setAmount] = useState(10000);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const recurring = kind === "recurring" || kind === "card";
+  const [amount, setAmount] = useState(presetAmounts[0] ?? 10000);
+  const [name, setName] = useState(donor?.name ?? "");
+  const [phone, setPhone] = useState(donor?.phone ?? "");
+  const [email, setEmail] = useState(donor?.email ?? "");
   const [dayOfMonth, setDayOfMonth] = useState(25);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+
+  const endpoint =
+    kind === "card" ? "/api/donations/card/init"
+    : kind === "recurring" ? "/api/donations/recurring/init"
+    : "/api/donations/transfer/init";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,9 +212,8 @@ function TransferForm({ orgSlug, campaignSlug, recurring }: {
     }
     setBusy(true);
     setError("");
-    const url = recurring ? "/api/donations/recurring/init" : "/api/donations/transfer/init";
     try {
-      const res = await fetch(url, {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -199,14 +239,15 @@ function TransferForm({ orgSlug, campaignSlug, recurring }: {
   if (done) {
     return (
       <div className="py-6 text-center">
-        <CheckCircle2 className="mx-auto h-12 w-12 text-brand-500" strokeWidth={1.5} />
+        <CheckCircle2 className="mx-auto h-12 w-12" strokeWidth={1.5} style={{ color: themeColor }} />
         <p className="mt-3 font-semibold text-stone-900">
-          {recurring ? "정기후원 신청이 완료되었습니다" : "후원이 완료되었습니다"}
+          {thankYou?.title || (recurring ? "정기후원 신청이 완료되었습니다" : "후원이 완료되었습니다")}
         </p>
         <p className="mt-1 text-sm text-stone-500">
-          {recurring
-            ? `매월 ${dayOfMonth}일에 ${formatKRW(amount)}이 후원됩니다.`
-            : `${formatKRW(amount)}의 따뜻한 마음이 전달되었습니다.`}
+          {thankYou?.message
+            || (recurring
+              ? `매월 ${dayOfMonth}일에 ${formatKRW(amount)}이 후원됩니다.`
+              : `${formatKRW(amount)}의 따뜻한 마음이 전달되었습니다.`)}
         </p>
       </div>
     );
@@ -214,16 +255,23 @@ function TransferForm({ orgSlug, campaignSlug, recurring }: {
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {kind === "card" && (
+        <p className="rounded-xl bg-indigo-50 px-3 py-2.5 text-xs leading-relaxed text-indigo-700">
+          신용카드 정기후원은 핵토 빌링키로 매월 자동 결제됩니다.
+          카드 정보 입력은 실제 연동 시 핵토 결제창에서 안전하게 진행됩니다. (현재 Mock)
+        </p>
+      )}
       <div>
         <label className="text-sm font-medium text-stone-700">후원 금액</label>
         <div className="mt-1.5 grid grid-cols-4 gap-1.5">
           {presetAmounts.map((a) => (
             <button type="button" key={a} onClick={() => setAmount(a)}
+              style={amount === a ? { borderColor: themeColor, color: themeColor, backgroundColor: `${themeColor}14` } : {}}
               className={cn(
-                "rounded-xl border py-2 text-sm",
-                amount === a ? "border-brand-500 bg-brand-50 font-semibold text-brand-700" : "border-stone-200 text-stone-600"
+                "rounded-xl border py-2 text-xs font-medium",
+                amount === a ? "font-semibold" : "border-stone-200 text-stone-600"
               )}>
-              {a / 10000 >= 1 ? `${a / 10000}만원` : `${a / 1000}천원`}
+              {a >= 10000 ? `${(a / 10000).toLocaleString("ko-KR")}만원` : `${(a / 1000).toLocaleString("ko-KR")}천원`}
             </button>
           ))}
         </div>
@@ -231,7 +279,7 @@ function TransferForm({ orgSlug, campaignSlug, recurring }: {
           type="number" min={1000} step={1000} value={amount}
           onChange={(e) => {
             const v = Number(e.target.value);
-            setAmount(Number.isFinite(v) ? v : 0); // 빈 값/잘못된 값에서 NaN 노출 방지
+            setAmount(Number.isFinite(v) ? v : 0);
           }}
           className="mt-2 w-full rounded-xl border border-stone-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
           aria-label="직접 입력 금액"
@@ -256,7 +304,7 @@ function TransferForm({ orgSlug, campaignSlug, recurring }: {
       </div>
       {recurring && (
         <div>
-          <label className="text-sm font-medium text-stone-700">매월 출금일</label>
+          <label className="text-sm font-medium text-stone-700">매월 {kind === "card" ? "결제일" : "출금일"}</label>
           <select value={dayOfMonth} onChange={(e) => setDayOfMonth(Number(e.target.value))}
             className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-500">
             {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
@@ -272,10 +320,17 @@ function TransferForm({ orgSlug, campaignSlug, recurring }: {
       </label>
       {error && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600">{error}</p>}
       <button type="submit" disabled={busy}
-        className="w-full rounded-xl bg-brand-600 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
-        {busy ? "처리 중..." : recurring ? `매월 ${formatKRW(amount)} 정기후원 신청` : `${formatKRW(amount)} 후원하기`}
+        style={{ backgroundColor: themeColor }}
+        className="w-full rounded-xl py-3 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50">
+        {busy ? "처리 중..."
+          : recurring ? `매월 ${formatKRW(amount)} 정기후원 신청`
+          : `${formatKRW(amount)} 후원하기`}
       </button>
-      <p className="text-center text-[11px] text-stone-400">온기 간편 계좌이체로 안전하게 처리됩니다 (현재 Mock 연동)</p>
+      <p className="text-center text-[11px] text-stone-400">
+        {kind === "card"
+          ? "핵토 빌링키 자동결제로 처리됩니다 (현재 Mock 연동)"
+          : "핵토 내통장결제로 안전하게 처리됩니다 (현재 Mock 연동)"}
+      </p>
     </form>
   );
 }

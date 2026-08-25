@@ -8,7 +8,7 @@ echo   (개발 서버보다 3-5배 빠른 응답 속도)
 echo =========================================
 echo.
 echo [1/2] 빌드 중... (3-5분 소요)
-npm run build
+call npm.cmd run build
 if %ERRORLEVEL% neq 0 (
   echo [오류] 빌드 실패
   pause
@@ -20,5 +20,9 @@ echo.
 echo   http://localhost:3005
 echo   관리자: admin@onjung.kr / admin1234
 echo.
-npx next start -p 3005
+call npx.cmd next start -p 3005
+set "START_EXIT_CODE=%ERRORLEVEL%"
+echo.
+if not "%START_EXIT_CODE%"=="0" echo [오류] 프로덕션 서버 시작 실패 (종료 코드: %START_EXIT_CODE%)
 pause
+exit /b %START_EXIT_CODE%

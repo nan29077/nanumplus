@@ -6,6 +6,7 @@ const COLORS: Record<string, string> = {
   SMS: "#0ea5e9",
   EASY_TRANSFER: "#1b7a5a",
   RECURRING_TRANSFER: "#f59e0b",
+  RECURRING_CARD: "#8b5cf6",
 };
 
 export function ChannelDonutChart({

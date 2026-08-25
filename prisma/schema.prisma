@@ -16,8 +16,14 @@ enum UserRole {
 
 enum DonationChannel {
   SMS
-  EASY_TRANSFER
-  RECURRING_TRANSFER
+  EASY_TRANSFER      // 핵토 내통장결제(간편 계좌이체)
+  RECURRING_TRANSFER // 계좌 자동이체 정기후원
+  RECURRING_CARD     // 신용카드 정기후원(핵토 빌링키)
+}
+
+enum RecurringMethod {
+  TRANSFER // 계좌 자동이체
+  CARD     // 카드 빌링키
 }
 
 enum DonationStatus {
@@ -137,6 +143,8 @@ model Organization {
   qrCodes            QrCode[]
   settlements        Settlement[]
   fees               OrganizationFee[]
+  donationPage       DonationPage?
+  billingKeys        BillingKey[]
 }
 
 model OrganizationAdmin {
@@ -181,6 +189,7 @@ model Donor {
   memo            String?
   privacyConsent  Boolean   @default(false)
   isRecurring     Boolean   @default(false)
+  donorAccountId  String?
   deletedAt       DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -188,15 +197,19 @@ model Donor {
   organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   donations          Donation[]
   recurringDonations RecurringDonation[]
+  donorAccount       DonorAccount?       @relation(fields: [donorAccountId], references: [id], onDelete: SetNull)
+  billingKeys        BillingKey[]
 
   @@index([organizationId])
   @@index([organizationId, phone])
+  @@index([donorAccountId])
 }
 
 model Donation {
   id                    String          @id @default(cuid())
   organizationId        String?          // null = 기관 미매핑 SMS (기관배정 없음)
   donorId               String?
+  donorAccountId        String?
   campaignId            String?
   channel               DonationChannel
   amount                Int // KRW (SMS는 항상 3000)
@@ -214,11 +227,13 @@ model Donation {
 
   organization    Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   donor           Donor?           @relation(fields: [donorId], references: [id], onDelete: SetNull)
+  donorAccount    DonorAccount?    @relation(fields: [donorAccountId], references: [id], onDelete: SetNull)
   campaign        Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   settlementItems SettlementItem[]
 
   @@index([organizationId, donatedAt])
   @@index([organizationId, channel])
+  @@index([donorAccountId])
   @@index([campaignId])
   @@index([channel, status, donatedAt])   // 채널별 관리자 조회 최적화
   @@index([status, donatedAt])            // 상태별 필터링 최적화
@@ -231,17 +246,23 @@ model RecurringDonation {
   donorId            String
   amount             Int
   dayOfMonth         Int             @default(25)
+  method             RecurringMethod @default(TRANSFER)
   status             RecurringStatus @default(ACTIVE)
   providerContractId String?         @unique
+  billingKeyId       String?
+  donorAccountId     String?
   startedAt          DateTime        @default(now())
   cancelledAt        DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  donor        Donor        @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  donor        Donor         @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  donorAccount DonorAccount? @relation(fields: [donorAccountId], references: [id], onDelete: SetNull)
+  billingKey   BillingKey?   @relation(fields: [billingKeyId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
+  @@index([donorAccountId])
 }
 
 model Campaign {
@@ -386,4 +407,94 @@ model SettlementItem {
   donation   Donation   @relation(fields: [donationId], references: [id], onDelete: Cascade)
 
   @@index([settlementId])
+}
+
+
+// ───────────────────────── 후원자 계정 (플랫폼 통합) ─────────────────────────
+
+model DonorAccount {
+  id           String    @id @default(cuid())
+  provider     String    // kakao | naver | google | credentials
+  providerId   String    // 공급자 사용자 고유 ID
+  email        String?
+  name         String?
+  phone        String?
+  profileImage String?
+  lastLoginAt  DateTime?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  donorProfiles      Donor[]
+  donations          Donation[]
+  recurringDonations RecurringDonation[]
+  billingKeys        BillingKey[]
+
+  @@unique([provider, providerId])
+  @@index([email])
+  @@index([phone])
+}
+
+// ───────────────────────── 후원페이지 빌더 설정 ─────────────────────────
+
+model DonationPage {
+  id               String   @id @default(cuid())
+  organizationId   String   @unique
+
+  // 테마 / 히어로
+  themeColor       String   @default("#2f8f5b")
+  heroImageUrl     String?
+  heroTitle        String?
+  heroSubtitle     String?
+
+  // 소개 / 스토리
+  introTitle       String?
+  introBody        String?  @db.Text
+  blocks           String?  @db.Text // JSON: [{type,heading,body,imageUrl,caption}]
+
+  // 후원 옵션
+  suggestedAmounts String?  @db.Text // JSON: [10000,30000,50000]
+  enabledChannels  String?  @db.Text // JSON: ["SMS","EASY_TRANSFER","RECURRING_TRANSFER","RECURRING_CARD"]
+
+  // 감사 메시지
+  thankYouTitle    String?
+  thankYouMessage  String?  @db.Text
+
+  // 노출 토글
+  showStats        Boolean  @default(true)
+  showCampaigns    Boolean  @default(true)
+  showFaq          Boolean  @default(false)
+
+  isPublished      Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────────── 카드 빌링키 (정기후원) ─────────────────────────
+
+model BillingKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  donorAccountId String?
+  donorId        String?
+  provider       String    @default("hecto")
+  billingKeyRef  String    // 공급자 빌링키 토큰/참조값 (평문 카드정보 저장 금지)
+  cardIssuer     String?   // 카드사
+  cardLast4      String?   // 카드 끝 4자리
+  status         String    @default("ACTIVE") // ACTIVE | PAUSED | DELETED | FAILED
+  issuedAt       DateTime  @default(now())
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  donorAccount       DonorAccount?       @relation(fields: [donorAccountId], references: [id], onDelete: SetNull)
+  donor              Donor?              @relation(fields: [donorId], references: [id], onDelete: SetNull)
+  recurringDonations RecurringDonation[]
+
+  @@index([organizationId])
+  @@index([donorAccountId])
+  @@index([donorId])
 }

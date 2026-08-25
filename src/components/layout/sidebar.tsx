@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { HeartHandshake, LogOut, Menu, X } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/brand-mark";
 
 export type NavItem = { href: string; label: string; icon: LucideIcon };
 export type NavGroup = { heading: string; items: NavItem[] };
@@ -35,8 +37,8 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
 }
 
 export function Sidebar({
-  sections, title, userName, logoHref = "/",
-}: { sections: NavSection[]; title: string; userName: string; logoHref?: string }) {
+  sections, title, userName, logoHref = "/", avatarUrl,
+}: { sections: NavSection[]; title: string; userName: string; logoHref?: string; avatarUrl?: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -46,9 +48,7 @@ export function Sidebar({
   const nav = (
     <nav className="flex h-full flex-col">
       <Link href={logoHref} className="flex items-center gap-2 px-5 py-5">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white">
-          <HeartHandshake className="h-5 w-5" strokeWidth={1.75} />
-        </span>
+        <BrandMark />
         <div>
           <p className="text-sm font-bold text-stone-900">나눔플러스</p>
           <p className="text-[11px] text-stone-400">{title}</p>
@@ -93,7 +93,19 @@ export function Sidebar({
       </div>
 
       <div className="border-t border-stone-100 p-3">
-        <p className="px-3 pb-2 text-xs text-stone-400">{userName} 님</p>
+        {avatarUrl ? (
+          <div className="mb-2 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#f8f3e9] to-brand-50 p-2.5">
+            <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-white shadow-sm">
+              <Image src={avatarUrl} alt={`${title} 프로필 캐릭터`} fill sizes="44px" className="object-cover" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-stone-800">{userName} 님</p>
+              <p className="mt-0.5 truncate text-[10px] text-stone-400">{title}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="px-3 pb-2 text-xs text-stone-400">{userName} 님</p>
+        )}
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-stone-600 hover:bg-stone-50"
@@ -109,7 +121,14 @@ export function Sidebar({
     <>
       {/* 모바일 헤더 */}
       <header className="sticky top-0 z-40 flex items-center justify-between border-b border-stone-200 bg-white px-4 py-3 lg:hidden">
-        <span className="text-sm font-bold text-stone-900">나눔플러스 · {title}</span>
+        <span className="flex min-w-0 items-center gap-2.5 text-sm font-bold text-stone-900">
+          {avatarUrl && (
+            <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-stone-100 shadow-sm">
+              <Image src={avatarUrl} alt="" fill sizes="32px" className="object-cover" />
+            </span>
+          )}
+          <span className="truncate">나눔플러스 · {title}</span>
+        </span>
         <button onClick={() => setOpen(true)} aria-label="메뉴 열기"
           className="grid h-9 w-9 place-items-center rounded-lg border border-stone-200 text-stone-600">
           <Menu className="h-5 w-5" strokeWidth={1.75} />

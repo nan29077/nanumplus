@@ -1,17 +1,10 @@
 @echo off
-chcp 65001 > nul
+setlocal EnableExtensions
 cd /d "%~dp0"
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-nanumplus.ps1"
+set "LAUNCH_EXIT_CODE=%ERRORLEVEL%"
 echo.
-echo =========================================
-echo   나눔플러스 서버 시작
-echo   http://localhost:3005
-echo =========================================
-echo.
-echo   관리자: admin@onjung.kr / admin1234
-echo.
-echo =========================================
-echo   서버를 중지하려면 Ctrl+C 를 누르세요.
-echo =========================================
-echo.
-npm run dev
-pause
+if not "%LAUNCH_EXIT_CODE%"=="0" echo Startup failed with exit code %LAUNCH_EXIT_CODE%.
+echo Press any key to close this window.
+pause >nul
+exit /b %LAUNCH_EXIT_CODE%

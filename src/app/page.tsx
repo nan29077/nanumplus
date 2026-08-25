@@ -9,6 +9,12 @@ import {
 import { PublicHeader, PublicFooter } from "@/components/layout/public-layout";
 import { HeroSlider } from "@/components/donation/hero-slider";
 import { Faq } from "@/components/donation/faq";
+import { CampaignCard } from "@/components/donation/campaign-card";
+import { OrganizationCard } from "@/components/donation/organization-card";
+import { prisma } from "@/lib/prisma";
+import { BrandMark } from "@/components/brand-mark";
+
+export const dynamic = "force-dynamic";
 
 const features = [
   { icon: MessageSquare, title: "문자후원", desc: "인포뱅크 문자후원 번호(#2540 + 기관 고유번호)로 문자 한 통이면 후원이 완료됩니다.", color: "bg-sky-50 text-sky-600" },
@@ -18,19 +24,19 @@ const features = [
 ];
 
 const reasons = [
-  { icon: Eye, title: "투명한 후원금 관리", desc: "모든 후원 내역이 채널별·날짜별로 기록되어 언제든 확인할 수 있습니다." },
-  { icon: BarChart3, title: "일별 · 월별 · 캘린더 통계", desc: "대시보드와 캘린더에서 모금 흐름을 한눈에 파악합니다." },
-  { icon: Megaphone, title: "크라우드 모금 캠페인", desc: "기관이 직접 캠페인 페이지를 만들어 목표 금액을 향해 모금합니다." },
-  { icon: ShieldCheck, title: "안전한 권한 관리", desc: "기관 관리자는 본인 기관 데이터만 접근하는 엄격한 권한 분리." },
-  { icon: Users, title: "후원자 관리", desc: "후원자별 이력과 정기후원 여부를 관리하고 개인정보는 마스킹 처리합니다." },
-  { icon: FileSpreadsheet, title: "리포트 다운로드", desc: "기간별 후원 내역을 CSV로 내려받아 회계·보고에 활용합니다." },
+  { icon: Eye, title: "투명한 후원금 관리", desc: "모든 후원 내역이 채널별·날짜별로 기록되어 언제든 확인할 수 있습니다.", tone: "bg-[#edf5ef] text-[#36705a]" },
+  { icon: BarChart3, title: "일별 · 월별 · 캘린더 통계", desc: "대시보드와 캘린더에서 모금 흐름을 한눈에 파악합니다.", tone: "bg-[#edf4f8] text-[#4d7890]" },
+  { icon: Megaphone, title: "크라우드 모금 캠페인", desc: "기관이 직접 캠페인 페이지를 만들어 목표 금액을 향해 모금합니다.", tone: "bg-[#faeee8] text-[#bd7358]" },
+  { icon: ShieldCheck, title: "안전한 권한 관리", desc: "기관 관리자는 본인 기관 데이터만 접근하는 엄격한 권한 분리.", tone: "bg-[#f1eff8] text-[#74689b]" },
+  { icon: Users, title: "후원자 관리", desc: "후원자별 이력과 정기후원 여부를 관리하고 개인정보는 마스킹 처리합니다.", tone: "bg-[#fff3d9] text-[#a97827]" },
+  { icon: FileSpreadsheet, title: "리포트 다운로드", desc: "기간별 후원 내역을 CSV로 내려받아 회계·보고에 활용합니다.", tone: "bg-[#f6ecef] text-[#a86578]" },
 ];
 
 const impactStats = [
-  { num: "120+", label: "등록 기관 (목표)", icon: Globe },
-  { num: "8.5억+", label: "누적 모금액 (목표)", icon: TrendingUp },
-  { num: "15,000+", label: "누적 후원자 (목표)", icon: Users },
-  { num: "99.9%", label: "서비스 안정성 (목표)", icon: Award },
+  { num: "120+", label: "등록 기관 (목표)", icon: Globe, tone: "bg-[#edf5ef] text-[#36705a]" },
+  { num: "8.5억+", label: "누적 모금액 (목표)", icon: TrendingUp, tone: "bg-[#faeee8] text-[#b96850]" },
+  { num: "15,000+", label: "누적 후원자 (목표)", icon: Users, tone: "bg-[#fff3d9] text-[#9a702d]" },
+  { num: "99.9%", label: "서비스 안정성 (목표)", icon: Award, tone: "bg-[#edf2f7] text-[#52728b]" },
 ];
 
 const testimonials = [
@@ -91,12 +97,12 @@ const onboardSteps = [
 ];
 
 const trustBadges = [
-  { icon: Lock, label: "SSL 암호화", sub: "전 구간 보안 통신" },
-  { icon: ShieldCheck, label: "개인정보 보호", sub: "마스킹·최소 수집" },
-  { icon: CheckCheck, label: "실시간 집계", sub: "지연 없는 후원 반영" },
-  { icon: Zap, label: "99.9% 업타임", sub: "연중무휴 안정 운영" },
-  { icon: FileSpreadsheet, label: "회계 연동", sub: "CSV 리포트 제공" },
-  { icon: Star, label: "전담 CS", sub: "기관 전용 고객 지원" },
+  { icon: Lock, label: "SSL 암호화", sub: "전 구간 보안 통신", tone: "bg-[#edf5ef] text-[#36705a]" },
+  { icon: ShieldCheck, label: "개인정보 보호", sub: "마스킹·최소 수집", tone: "bg-[#edf4f8] text-[#4d7890]" },
+  { icon: CheckCheck, label: "실시간 집계", sub: "지연 없는 후원 반영", tone: "bg-[#faeee8] text-[#bd7358]" },
+  { icon: Zap, label: "99.9% 업타임", sub: "연중무휴 안정 운영", tone: "bg-[#fff3d9] text-[#a97827]" },
+  { icon: FileSpreadsheet, label: "회계 연동", sub: "CSV 리포트 제공", tone: "bg-[#f1eff8] text-[#74689b]" },
+  { icon: Star, label: "전담 CS", sub: "기관 전용 고객 지원", tone: "bg-[#f6ecef] text-[#a86578]" },
 ];
 
 const dashboardStats = [
@@ -109,7 +115,7 @@ const dashboardStats = [
 function SectionTitle({ eyebrow, title, desc }: { eyebrow: string; title: string; desc?: string }) {
   return (
     <div className="mx-auto max-w-2xl text-center">
-      <p className="text-sm font-semibold text-brand-600">{eyebrow}</p>
+      <p className="text-sm font-semibold text-[#b86f55]">{eyebrow}</p>
       <h2 className="mt-2 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">{title}</h2>
       {desc && <p className="mt-3 text-stone-500">{desc}</p>}
     </div>
@@ -128,23 +134,60 @@ function StarRating() {
   );
 }
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // 공개 메인 화면은 DB 점검 중에도 나머지 안내 콘텐츠가 노출되도록 안전하게 폴백한다.
+  const organizations = await prisma.organization.findMany({
+    where: { isActive: true, deletedAt: null },
+    orderBy: { createdAt: "asc" },
+    take: 6,
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logoUrl: true,
+      description: true,
+      address: true,
+      _count: { select: { donors: true } },
+      campaigns: {
+        where: { isPublished: true, deletedAt: null },
+        select: { id: true },
+      },
+    },
+  }).catch(() => []);
+
+  const featuredCampaigns = await prisma.campaign.findMany({
+    where: {
+      isPublished: true,
+      deletedAt: null,
+      status: { in: ["ACTIVE", "ENDED"] },
+      organization: { isActive: true, deletedAt: null },
+    },
+    include: {
+      organization: { select: { name: true } },
+      _count: { select: { donations: true } },
+    },
+    orderBy: [{ status: "asc" }, { endDate: "asc" }],
+    take: 6,
+  }).catch(() => []);
+
   return (
     <div>
       <PublicHeader />
-      <main>
+      <main className="bg-[#fcfaf6]">
         {/* 상단 메인 배너 슬라이더 */}
         <HeroSlider />
 
         {/* 임팩트 숫자 */}
-        <section className="bg-brand-700 py-12">
+        <section className="border-b border-[#eee3d5] bg-[#f7f0e6] py-10">
           <div className="mx-auto max-w-6xl px-4">
-            <div className="grid grid-cols-2 gap-8 text-center sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4 sm:gap-5">
               {impactStats.map((s) => (
-                <div key={s.label}>
-                  <s.icon className="mx-auto mb-2 h-6 w-6 text-brand-300" strokeWidth={1.5} />
-                  <p className="text-3xl font-extrabold text-white sm:text-4xl">{s.num}</p>
-                  <p className="mt-1 text-sm font-medium text-brand-200">{s.label}</p>
+                <div key={s.label} className="rounded-3xl border border-white/80 bg-white/70 px-3 py-5 shadow-[0_8px_30px_rgba(99,73,45,0.06)] backdrop-blur">
+                  <span className={`mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl ${s.tone}`}>
+                    <s.icon className="h-5 w-5" strokeWidth={1.6} />
+                  </span>
+                  <p className="text-2xl font-extrabold text-[#46372d] sm:text-3xl">{s.num}</p>
+                  <p className="mt-1 text-xs font-medium text-stone-500 sm:text-sm">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -152,7 +195,7 @@ export default function LandingPage() {
         </section>
 
         {/* 신뢰 지표 배지 */}
-        <section className="border-b border-stone-100 bg-white py-8">
+        <section className="border-b border-[#eee5d9] bg-[#fffdf9] py-9">
           <div className="mx-auto max-w-6xl px-4">
             <p className="mb-6 text-center text-xs font-semibold uppercase tracking-widest text-stone-400">
               전국 120여 사회복지기관이 신뢰하는 플랫폼 (목표)
@@ -160,7 +203,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
               {trustBadges.map((b) => (
                 <div key={b.label} className="flex flex-col items-center text-center">
-                  <span className="mb-1.5 grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
+                  <span className={`mb-1.5 grid h-10 w-10 place-items-center rounded-2xl ${b.tone}`}>
                     <b.icon className="h-5 w-5" strokeWidth={1.75} />
                   </span>
                   <p className="text-xs font-semibold text-stone-800">{b.label}</p>
@@ -171,19 +214,106 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* 참여 기관 */}
+        <section id="organizations" className="relative overflow-hidden bg-[#fbf7f0] py-20">
+          <div className="pointer-events-none absolute -left-24 top-8 h-64 w-64 rounded-full bg-[#e8f2e8] blur-3xl" />
+          <div className="pointer-events-none absolute -right-20 bottom-0 h-72 w-72 rounded-full bg-[#f8e5d7] blur-3xl" />
+          <div className="relative mx-auto max-w-6xl px-4">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-sm font-semibold text-[#bd7358]">우리 곁의 따뜻한 기관</p>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+                  마음이 머무는 곳을 만나보세요
+                </h2>
+                <p className="mt-3 leading-relaxed text-stone-500">
+                  지역의 가장 가까운 곳에서 이웃을 돌보는 기관들입니다. 카드를 눌러 기관의 이야기와 진행 중인 캠페인을 확인해 보세요.
+                </p>
+              </div>
+              <Link href="/organizations" className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:text-brand-800">
+                모든 기관 보기 <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            {organizations.length > 0 ? (
+              <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {organizations.map((org) => (
+                  <OrganizationCard
+                    key={org.id}
+                    name={org.name}
+                    slug={org.slug}
+                    logoUrl={org.logoUrl}
+                    description={org.description}
+                    address={org.address}
+                    donorCount={org._count.donors}
+                    campaignCount={org.campaigns.length}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-10 rounded-3xl border border-dashed border-[#dccbb5] bg-white/70 px-6 py-12 text-center text-sm text-stone-500">
+                참여 기관을 준비하고 있습니다. 곧 따뜻한 이야기를 소개해 드릴게요.
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* 추천 캠페인 */}
+        <section id="campaigns" className="bg-[#fffdf9] py-20">
+          <div className="mx-auto max-w-6xl px-4">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-sm font-semibold text-brand-600">지금 이어지는 나눔</p>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+                  오늘, 마음을 보탤 수 있는 캠페인
+                </h2>
+                <p className="mt-3 leading-relaxed text-stone-500">
+                  참여 기관이 직접 전하는 현장의 이야기를 읽고, 내가 응원하고 싶은 변화를 선택해 주세요.
+                </p>
+              </div>
+              <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:text-brand-800">
+                전체 캠페인 보기 <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            {featuredCampaigns.length > 0 ? (
+              <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {featuredCampaigns.map((campaign) => (
+                  <Link key={campaign.id} href={`/campaigns/${campaign.slug}`} className="block h-full">
+                    <CampaignCard
+                      title={campaign.title}
+                      orgName={campaign.organization.name}
+                      coverImageUrl={campaign.coverImageUrl}
+                      goalAmount={campaign.goalAmount}
+                      currentAmount={campaign.currentAmount}
+                      endDate={campaign.endDate}
+                      donorCount={campaign._count.donations}
+                      status={campaign.status}
+                      allowedChannels={campaign.allowedChannels}
+                    />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-10 rounded-3xl bg-[#f7f2e9] px-6 py-12 text-center text-sm text-stone-500">
+                새로운 캠페인을 준비하고 있습니다. 조금만 기다려 주세요.
+              </div>
+            )}
+          </div>
+        </section>
+
         {/* 서비스 소개 */}
         <section className="mx-auto max-w-6xl px-4 py-20">
           <SectionTitle
             eyebrow="후원 채널"
             title="후원의 시작부터 보고까지, 한 곳에서"
-            desc="나눔플러스은 사회복지기관이 온라인으로 후원금을 모금하고 투명하게 관리할 수 있도록 돕는 플랫폼입니다."
+            desc="나눔플러스는 사회복지기관이 온라인으로 후원금을 모금하고 투명하게 관리할 수 있도록 돕는 플랫폼입니다."
           />
           <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {features.map((f) => (
               <div
                 key={f.title}
                 id={f.title === "문자후원" ? "sms" : undefined}
-                className="rounded-2xl border border-stone-200 bg-white p-6 shadow-card transition-shadow hover:shadow-lg"
+                className="rounded-3xl border border-[#ede2d4] bg-white p-6 shadow-[0_10px_34px_rgba(99,73,45,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(99,73,45,0.11)]"
               >
                 <span className={`grid h-11 w-11 place-items-center rounded-xl ${f.color}`}>
                   <f.icon className="h-5 w-5" strokeWidth={1.75} />
@@ -196,7 +326,7 @@ export default function LandingPage() {
         </section>
 
         {/* 채널 비교 표 */}
-        <section className="bg-warm-50 py-16">
+        <section className="bg-[#f5eee5] py-16">
           <div className="mx-auto max-w-6xl px-4">
             <SectionTitle
               eyebrow="채널 비교"
@@ -204,7 +334,7 @@ export default function LandingPage() {
               desc="기관 특성과 후원자 구성에 맞는 채널을 선택하거나 모두 함께 운영할 수 있습니다."
             />
             <div className="mt-10 overflow-x-auto">
-              <table className="w-full min-w-[600px] rounded-2xl border border-stone-200 bg-white shadow-card">
+              <table className="w-full min-w-[600px] rounded-3xl border border-[#eadfce] bg-[#fffdf9] shadow-[0_12px_36px_rgba(99,73,45,0.07)]">
                 <thead>
                   <tr className="border-b border-stone-100">
                     <th className="px-5 py-3.5 text-left text-xs font-semibold text-stone-500">항목</th>
@@ -282,7 +412,7 @@ export default function LandingPage() {
         </section>
 
         {/* 간편 계좌이체 / 정기후원 안내 */}
-        <section className="bg-warm-50 py-20">
+        <section className="bg-[#f8f1e8] py-20">
           <div className="mx-auto max-w-6xl px-4">
             <SectionTitle
               eyebrow="계좌 후원"
@@ -290,7 +420,7 @@ export default function LandingPage() {
               desc="온기 간편 계좌이체로 일시 후원을, 정기 계좌후원으로 꾸준한 나눔을 이어갈 수 있습니다."
             />
             <div className="mt-12 grid gap-5 md:grid-cols-2">
-              <div className="rounded-2xl border border-stone-200 bg-white p-7 shadow-card">
+              <div className="rounded-3xl border border-[#e5ded0] bg-[#fffdf9] p-7 shadow-[0_12px_36px_rgba(99,73,45,0.07)]">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-brand-600">
                   <Landmark className="h-5 w-5" strokeWidth={1.75} />
                 </span>
@@ -307,7 +437,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
               </div>
-              <div className="rounded-2xl border border-stone-200 bg-white p-7 shadow-card">
+              <div className="rounded-3xl border border-[#efdfd1] bg-[#fffaf6] p-7 shadow-[0_12px_36px_rgba(99,73,45,0.07)]">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-amber-50 text-amber-600">
                   <RefreshCw className="h-5 w-5" strokeWidth={1.75} />
                 </span>
@@ -338,9 +468,7 @@ export default function LandingPage() {
           <div className="mt-12 overflow-hidden rounded-3xl border border-stone-200 bg-stone-50 p-4 shadow-xl sm:p-6">
             {/* 가짜 대시보드 UI */}
             <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 shadow-sm">
-              <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-600">
-                <HeartHandshake className="h-4 w-4 text-white" strokeWidth={1.75} />
-              </span>
+              <BrandMark className="h-7 w-7" />
               <span className="text-sm font-bold text-stone-900">나눔플러스 관리자</span>
               <span className="ml-auto text-xs text-stone-400">서울 은평구 종합사회복지관</span>
             </div>
@@ -400,16 +528,16 @@ export default function LandingPage() {
         </section>
 
         {/* 사회복지기관이 사용하는 이유 */}
-        <section className="bg-warm-50 py-20">
+        <section className="bg-[#faeee8] py-20">
           <div className="mx-auto max-w-6xl px-4">
             <SectionTitle
               eyebrow="기관을 위한 기능"
-              title="사회복지기관이 나눔플러스을 사용하는 이유"
+              title="사회복지기관이 나눔플러스를 사용하는 이유"
             />
             <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {reasons.map((r) => (
-                <div key={r.title} className="rounded-2xl border border-stone-200 bg-white p-6 shadow-card">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
+                <div key={r.title} className="rounded-3xl border border-white/80 bg-white/85 p-6 shadow-[0_10px_32px_rgba(99,73,45,0.07)]">
+                  <span className={`grid h-10 w-10 place-items-center rounded-2xl ${r.tone}`}>
                     <r.icon className="h-5 w-5" strokeWidth={1.75} />
                   </span>
                   <h3 className="mt-3 font-semibold text-stone-900">{r.title}</h3>
@@ -488,7 +616,7 @@ export default function LandingPage() {
         </section>
 
         {/* 기관 담당자 후기 */}
-        <section className="bg-warm-50 py-20">
+        <section className="bg-[#f4f0e9] py-20">
           <div className="mx-auto max-w-6xl px-4">
             <SectionTitle
               eyebrow="현장의 목소리"
@@ -497,7 +625,7 @@ export default function LandingPage() {
             />
             <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {testimonials.map((t) => (
-                <div key={t.name} className="flex flex-col rounded-2xl border border-stone-200 bg-white p-6 shadow-card">
+                <div key={t.name} className="flex flex-col rounded-3xl border border-[#e8ded1] bg-[#fffdf9] p-6 shadow-[0_10px_32px_rgba(99,73,45,0.07)]">
                   <StarRating />
                   <p className="mt-4 flex-1 text-sm leading-relaxed text-stone-600">
                     &ldquo;{t.quote}&rdquo;
@@ -579,7 +707,7 @@ export default function LandingPage() {
         </section>
 
         {/* 후원 진행 프로세스 / 기관 도입 프로세스 */}
-        <section id="process" className="bg-warm-50 py-20">
+        <section id="process" className="bg-[#f7f0e7] py-20">
           <div className="mx-auto max-w-6xl px-4">
             <div className="grid gap-12 lg:grid-cols-2">
               <div>
@@ -587,7 +715,7 @@ export default function LandingPage() {
                 <p className="mt-1 text-sm text-stone-500">후원자가 후원을 결정한 순간부터 기록까지</p>
                 <ol className="mt-6 space-y-4">
                   {donateSteps.map((s, i) => (
-                    <li key={s.title} className="flex gap-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-card">
+                    <li key={s.title} className="flex gap-4 rounded-3xl border border-[#e5ded0] bg-[#fffdf9] p-4 shadow-[0_8px_26px_rgba(99,73,45,0.06)]">
                       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white">
                         {i + 1}
                       </span>
@@ -604,8 +732,8 @@ export default function LandingPage() {
                 <p className="mt-1 text-sm text-stone-500">신청부터 모금 시작까지 최소 1영업일</p>
                 <ol className="mt-6 space-y-4">
                   {onboardSteps.map((s, i) => (
-                    <li key={s.title} className="flex gap-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-card">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-stone-800 text-sm font-bold text-white">
+                    <li key={s.title} className="flex gap-4 rounded-3xl border border-[#eadbd4] bg-[#fffaf7] p-4 shadow-[0_8px_26px_rgba(99,73,45,0.06)]">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#c77a5c] text-sm font-bold text-white">
                         {i + 1}
                       </span>
                       <div>
@@ -621,7 +749,7 @@ export default function LandingPage() {
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="py-20">
+        <section id="faq" className="bg-[#fffdf9] py-20">
           <div className="mx-auto max-w-3xl px-4">
             <SectionTitle eyebrow="FAQ" title="자주 묻는 질문" />
             <div className="mt-10">
@@ -631,11 +759,11 @@ export default function LandingPage() {
         </section>
 
         {/* 도입 문의 연락처 */}
-        <section className="bg-warm-50 py-16">
+        <section className="bg-[#f8eee8] py-16">
           <div className="mx-auto max-w-6xl px-4">
             <SectionTitle
               eyebrow="도입 문의"
-              title="우리 기관에도 나눔플러스을 도입하고 싶으신가요?"
+              title="우리 기관에도 나눔플러스를 도입하고 싶으신가요?"
               desc="담당자가 직접 연락드려 무료 데모와 도입 절차를 안내해 드립니다."
             />
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
@@ -644,8 +772,8 @@ export default function LandingPage() {
                 { icon: Mail, label: "이메일 문의", value: "hello@onjeong.kr", sub: "24시간 접수 가능" },
                 { icon: MapPin, label: "소재지", value: "서울특별시 마포구", sub: "방문 상담 가능" },
               ].map((c) => (
-                <div key={c.label} className="flex items-start gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-card">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">
+                <div key={c.label} className="flex items-start gap-4 rounded-3xl border border-white/80 bg-white/85 p-5 shadow-[0_10px_30px_rgba(99,73,45,0.07)]">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#edf5ef] text-[#36705a]">
                     <c.icon className="h-5 w-5" strokeWidth={1.75} />
                   </span>
                   <div>
@@ -660,34 +788,34 @@ export default function LandingPage() {
         </section>
 
         {/* 하단 CTA */}
-        <section className="px-4 py-20">
-          <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-brand-700">
+        <section className="bg-[#fffdf9] px-4 py-20">
+          <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-[#ead9c5] bg-gradient-to-br from-[#f5e6d5] via-[#faeee7] to-[#e9f1e9] shadow-[0_20px_60px_rgba(99,73,45,0.12)]">
             <div className="grid items-center gap-0 lg:grid-cols-5">
               <div className="px-8 py-14 text-center lg:col-span-3 lg:text-left">
-                <HeartHandshake className="mx-auto mb-4 h-10 w-10 text-brand-200 lg:mx-0" strokeWidth={1.5} />
-                <h2 className="text-2xl font-bold text-white sm:text-3xl">
+                <HeartHandshake className="mx-auto mb-4 h-10 w-10 text-[#39705a] lg:mx-0" strokeWidth={1.5} />
+                <h2 className="text-2xl font-bold text-[#46372d] sm:text-3xl">
                   우리 기관의 모금, 오늘부터 투명하게
                 </h2>
-                <p className="mt-3 text-brand-100">
-                  문자후원 번호 부여부터 QR 코드 발급, 캠페인 운영까지 나눔플러스이 함께합니다.
+                <p className="mt-3 text-stone-600">
+                  문자후원 번호 부여부터 QR 코드 발급, 캠페인 운영까지 나눔플러스가 함께합니다.
                 </p>
                 <div className="mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
                   <Link
                     href="/login"
-                    className="rounded-xl bg-white px-6 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+                    className="rounded-full bg-[#285d49] px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-[#214d3d]"
                   >
                     기관 로그인
                   </Link>
                   <Link
                     href="/campaigns"
-                    className="rounded-xl border border-brand-400 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-600"
+                    className="rounded-full border border-[#d7bda2] bg-white/60 px-6 py-3 text-sm font-semibold text-[#684e3c] hover:bg-white"
                   >
                     진행 중인 캠페인 보기
                   </Link>
                 </div>
               </div>
-              <div className="hidden border-l border-brand-600 px-8 py-14 lg:col-span-2 lg:block">
-                <p className="text-sm font-semibold text-brand-200">나눔플러스 도입 기관 현황 (예시)</p>
+              <div className="hidden border-l border-[#ddc9b3] px-8 py-14 lg:col-span-2 lg:block">
+                <p className="text-sm font-semibold text-[#8b6650]">나눔플러스 도입 기관 현황 (예시)</p>
                 <ul className="mt-4 space-y-3">
                   {[
                     { region: "서울·경기", count: "48개 기관" },
@@ -697,8 +825,8 @@ export default function LandingPage() {
                     { region: "기타 지역", count: "15개 기관" },
                   ].map((r) => (
                     <li key={r.region} className="flex items-center justify-between">
-                      <span className="text-sm text-brand-200">{r.region}</span>
-                      <span className="rounded-full bg-brand-600 px-3 py-0.5 text-xs font-semibold text-white">{r.count}</span>
+                      <span className="text-sm text-stone-600">{r.region}</span>
+                      <span className="rounded-full bg-white/75 px-3 py-0.5 text-xs font-semibold text-[#486b5c] shadow-sm">{r.count}</span>
                     </li>
                   ))}
                 </ul>

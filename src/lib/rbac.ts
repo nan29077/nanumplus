@@ -7,8 +7,10 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string;
-  role: "SUPER_ADMIN" | "ORG_ADMIN";
+  role: "SUPER_ADMIN" | "ORG_ADMIN" | "DONOR";
   organizationId: string | null;
+  kind?: "admin" | "donor";
+  donorAccountId?: string | null;
 };
 
 export async function getSessionUser(): Promise<SessionUser | null> {

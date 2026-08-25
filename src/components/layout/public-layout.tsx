@@ -1,24 +1,34 @@
 import Link from "next/link";
-import { HeartHandshake, LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, UserCircle2 } from "lucide-react";
 import { getSessionUser } from "@/lib/rbac";
+import { BrandMark } from "@/components/brand-mark";
 
 export async function PublicHeader() {
   const user = await getSessionUser();
+  const isDonor = user?.kind === "donor";
+  const isAdmin = !!user && !isDonor;
   const dashboardHref = user?.role === "SUPER_ADMIN" ? "/admin/dashboard" : "/org/dashboard";
 
   return (
-    <header className="sticky top-0 z-50 border-b border-stone-200 bg-white shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-[#eee4d6] bg-[#fffdf9]/95 shadow-[0_4px_20px_rgba(91,65,40,0.05)] backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5">
         <Link href="/" className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white">
-            <HeartHandshake className="h-5 w-5" strokeWidth={1.75} />
-          </span>
+          <BrandMark />
           <span className="text-base font-bold tracking-tight text-stone-900">나눔플러스</span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">
+          <Link href="/organizations" className="hidden rounded-lg px-3 py-2 text-stone-600 hover:bg-stone-50 sm:block">참여 기관</Link>
           <Link href="/campaigns" className="rounded-lg px-3 py-2 text-stone-600 hover:bg-stone-50">모금 캠페인</Link>
           <Link href="/#sms" className="hidden rounded-lg px-3 py-2 text-stone-600 hover:bg-stone-50 sm:block">후원 안내</Link>
-          {user ? (
+          {isDonor ? (
+            <Link
+              href="/my"
+              className="ml-1 flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
+            >
+              <UserCircle2 className="h-4 w-4" strokeWidth={1.75} />
+              마이페이지
+            </Link>
+          ) : isAdmin ? (
             <Link
               href={dashboardHref}
               className="ml-1 flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
@@ -27,9 +37,13 @@ export async function PublicHeader() {
               대시보드
             </Link>
           ) : (
-            <Link href="/login" className="ml-1 rounded-xl bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700">
-              로그인
-            </Link>
+            <>
+              <Link href="/login" className="hidden rounded-lg px-3 py-2 text-stone-500 hover:bg-stone-50 sm:block">기관 로그인</Link>
+              <Link href="/donor/login" className="ml-1 flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700">
+                <UserCircle2 className="h-4 w-4" strokeWidth={1.75} />
+                후원자 로그인
+              </Link>
+            </>
           )}
         </nav>
       </div>
@@ -39,13 +53,11 @@ export async function PublicHeader() {
 
 export function PublicFooter() {
   return (
-    <footer className="border-t border-stone-100 bg-warm-50">
+    <footer className="border-t border-[#eee3d5] bg-[#f8f1e8]">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-white">
-              <HeartHandshake className="h-4 w-4" strokeWidth={1.75} />
-            </span>
+            <BrandMark className="h-8 w-8" />
             <span className="font-bold text-stone-900">나눔플러스</span>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-stone-500">

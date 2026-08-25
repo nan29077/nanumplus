@@ -6,6 +6,7 @@ const tones = {
   amber: "bg-amber-50 text-amber-700 ring-amber-200",
   red: "bg-rose-50 text-rose-700 ring-rose-200",
   gray: "bg-stone-100 text-stone-600 ring-stone-200",
+  violet: "bg-violet-50 text-violet-700 ring-violet-200",
 } as const;
 
 export function Badge({
@@ -43,6 +44,7 @@ export function ChannelBadge({ channel }: { channel: string }) {
     SMS: { label: "문자후원", tone: "blue" },
     EASY_TRANSFER: { label: "간편 계좌이체", tone: "green" },
     RECURRING_TRANSFER: { label: "정기후원", tone: "amber" },
+    RECURRING_CARD: { label: "카드 정기후원", tone: "violet" },
   };
   const v = map[channel] ?? { label: channel, tone: "gray" as const };
   return <Badge tone={v.tone}>{v.label}</Badge>;

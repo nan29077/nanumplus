@@ -45,3 +45,12 @@ EMMA V.3 for Java/
 EMMA_unix_3_7_1/
 TalkFile_nanumplus_dump.sql
 emma-mo-keys-*.csv
+
+# Claude 작업 중 원본 백업 (커밋 제외)
+.nanumplus-backup/
+
+# 커밋 메시지 임시파일
+.commitmsg
+
+# 기관 계정 목록(개인정보 가능) - 원격 제외
+나눔플러스_기관계정목록.xlsx
