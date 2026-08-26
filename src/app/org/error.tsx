@@ -6,13 +6,23 @@ import Link from "next/link";
 
 export default function OrgError({
   error,
-  reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
   useEffect(() => {
     console.error("[OrgError]", error.message, error.digest);
+    // 서버 로그에 남겨 "오류 코드"만으로도 원인 추적이 가능하게 한다.
+    fetch("/api/public/client-error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        boundary: "org",
+        digest: error.digest ?? "",
+        message: error.message,
+        path: window.location.pathname,
+      }),
+    }).catch(() => {});
   }, [error]);
 
   return (
@@ -39,7 +49,7 @@ export default function OrgError({
         </div>
         <div className="mt-6 flex gap-3">
           <button
-            onClick={reset}
+            onClick={() => window.location.reload()}
             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
           >
             <RefreshCw className="h-4 w-4" strokeWidth={1.75} />
