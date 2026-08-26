@@ -8,6 +8,7 @@
     "start": "next start -p 3005",
     "lint": "next lint",
     "db:push": "prisma db push",
+    "db:sync-prod": "prisma db execute --file prisma/sync-prod-20260826.sql --schema prisma/schema.prisma",
     "db:emma": "bash emma-sql/install.sh",
     "db:seed": "tsx prisma/seed.ts",
     "db:init-admin": "tsx prisma/init-admin.ts",
