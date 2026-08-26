@@ -12,7 +12,7 @@ export async function GET() {
   const campaigns = await prisma.campaign.findMany({
     where: { organizationId: auth.user.organizationId!, deletedAt: null },
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { donations: true } } },
+    include: { _count: { select: { donations: { where: { status: "COMPLETED", deletedAt: null } } } } },
   });
   return Response.json({ campaigns });
 }

@@ -184,7 +184,9 @@ export async function getDashboardExtra(scope: Scope) {
 export async function getTopDonors(scope: Scope, limit = 5) {
   const rows = await prisma.donation.groupBy({
     by: ["donorId"],
-    where: completed(scope),
+    // donorId가 없는 후원(미매핑 SMS 등)이 하나의 "이름 없음" 후원자로 뭉쳐
+    // 상위권을 차지하지 않도록 제외한다
+    where: { ...completed(scope), donorId: { not: null } },
     _sum: { amount: true },
     _count: true,
     orderBy: { _sum: { amount: "desc" } },

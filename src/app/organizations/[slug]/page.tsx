@@ -21,7 +21,7 @@ export default async function OrganizationDetailPage({ params }: { params: { slu
     include: {
       campaigns: {
         where: { isPublished: true, deletedAt: null, status: { in: ["ACTIVE", "ENDED"] } },
-        include: { _count: { select: { donations: true } } },
+        include: { _count: { select: { donations: { where: { status: "COMPLETED", deletedAt: null } } } } },
         orderBy: [{ status: "asc" }, { endDate: "asc" }],
       },
     },

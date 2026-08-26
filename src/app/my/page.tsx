@@ -24,7 +24,11 @@ export default async function DonorMyPage() {
     }),
     prisma.billingKey.findMany({
       where: { donorAccountId: accId, status: "ACTIVE", deletedAt: null },
-      include: { organization: { select: { name: true } } },
+      // billingKeyRef(공급자 토큰) 등 민감 컬럼은 조회하지 않는다
+      select: {
+        id: true, cardIssuer: true, cardLast4: true, issuedAt: true,
+        organization: { select: { name: true } },
+      },
       orderBy: { issuedAt: "desc" },
     }),
     prisma.donation.aggregate({

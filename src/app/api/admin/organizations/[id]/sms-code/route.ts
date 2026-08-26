@@ -6,7 +6,9 @@ import { writeAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/validation";
 
 const schema = z.object({
-  code: z.string().regex(/^\d{1,4}$/, "1~4자리 숫자여야 합니다."),
+  // EMMA 수신번호 복원(mo_recipient + 4자리 emo_recipient)이 4자리를 전제하므로
+  // 기관 생성 API와 동일하게 정확히 4자리만 허용한다
+  code: z.string().regex(/^\d{4}$/, "문자 코드는 4자리 숫자여야 합니다."),
 });
 
 /**

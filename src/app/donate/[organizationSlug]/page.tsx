@@ -61,7 +61,7 @@ export default async function DonatePage({
             organizationId: org.id, isPublished: true, deletedAt: null,
             status: { in: ["ACTIVE", "ENDED"] },
           },
-          include: { _count: { select: { donations: true } } },
+          include: { _count: { select: { donations: { where: { status: "COMPLETED", deletedAt: null } } } } },
           orderBy: [{ status: "asc" }, { endDate: "asc" }],
           take: 4,
         }).catch(() => [])

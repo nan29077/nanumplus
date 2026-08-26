@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Pagination } from "@/components/donation/filter-bar";
 import { SmsDonationGrid, type SmsDonationRow } from "@/components/donation/sms-donation-card";
 import { SMS_DONATION_AMOUNT } from "@/lib/validation";
+import { maskPhone } from "@/lib/masking";
 import { periodRange } from "@/lib/kst-date";
 import { MessageSquare } from "lucide-react";
 
@@ -54,7 +55,8 @@ export default async function Page({
   const rows: SmsDonationRow[] = donations.map((d) => ({
     id: d.id,
     smsBody: d.smsBody ?? null,
-    senderPhone: d.senderPhone ?? null,
+    // 원본 발신번호가 RSC 직렬화로 브라우저에 노출되지 않도록 서버에서 마스킹
+    senderPhone: d.senderPhone ? maskPhone(d.senderPhone) : null,
     donatedAt: d.donatedAt.toISOString(),
     amount: d.amount,
     status: d.status,

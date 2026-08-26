@@ -1,6 +1,6 @@
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { parsePageParam } from "@/lib/utils";
+import { parsePageParam, parseStatusParam } from "@/lib/utils";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { DonationTable } from "@/components/donation/donation-table";
@@ -16,11 +16,17 @@ export default async function AdminDonationsPage({
   const page = parsePageParam(searchParams.page);
   const take = 20;
 
+  // 화이트리스트 검증 — 잘못된 값이 raw SQL의 enum 캐스팅 오류(서버 500)를 내지 않도록
+  const channel = parseStatusParam(searchParams.channel,
+    ["SMS", "EASY_TRANSFER", "RECURRING_TRANSFER", "RECURRING_CARD"] as const);
+  const status = parseStatusParam(searchParams.status,
+    ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED"] as const);
+
   const [{ rows, total }, orgs] = await Promise.all([
     fetchAllDonations(
       searchParams.orgId ?? null,
-      searchParams.channel ?? null,
-      searchParams.status ?? null,
+      channel ?? null,
+      status ?? null,
       take,
       (page - 1) * take
     ),

@@ -102,6 +102,14 @@ export async function generateSettlements(organizationId?: string) {
       deletedAt: null,
       settlementItems: { none: {} },
       organizationId: { not: null },
+      // 삭제·비활성 기관 앞으로 정산이 생성되지 않도록 제외
+      // (비활성 기관은 재활성화되면 settlementItems가 없는 건이 다시 잡혀 정산된다)
+      organization: { deletedAt: null, isActive: true },
+      // 엑셀 마이그레이션으로 이관된 과거 후원은 플랫폼 도입 이전에 이미 지급된
+      // 내역이므로 신규 정산 대상에서 제외한다 (이중 지급 방지).
+      // providerName이 NULL인 행은 정산 대상 유지 — nullable 필드에 not만 쓰면
+      // Prisma가 NULL 행까지 제외하므로 OR로 명시한다.
+      OR: [{ providerName: null }, { providerName: { not: "migration" } }],
       ...(organizationId ? { organizationId } : {}),
     },
     include: {

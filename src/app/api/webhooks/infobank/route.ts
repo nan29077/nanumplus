@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getInfobankAdapter } from "@/lib/adapters";
 import { SMS_DONATION_AMOUNT } from "@/lib/validation";
 import { syncCampaignAmountOnStatusChange } from "@/services/campaign-amount";
+import { writeAuditLog } from "@/lib/audit";
 
 /**
  * 인포뱅크 문자후원 MO 결과 웹훅.
@@ -67,9 +68,16 @@ export async function POST(req: Request) {
 
         // M-4: 후원 상태 업데이트 + 캠페인 모금액 업데이트를 트랜잭션으로 처리
         await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-          // 이중 가산 방지: 이미 next 상태이면 updateMany가 0건 반환 → 중복 처리 건너뜀
+          // 동시 웹훅 대비: 이전 상태를 트랜잭션 안에서 다시 읽고, 정확히 그 상태에서만
+          // 전이시킨다. (밖에서 읽은 상태로 델타를 계산하면 이중 가산 가능)
+          const current = await tx.donation.findUnique({
+            where: { id: donation.id },
+            select: { status: true, campaignId: true },
+          });
+          if (!current || current.status === next) return;
+
           const updated = await tx.donation.updateMany({
-            where: { id: donation.id, status: { not: next } },
+            where: { id: donation.id, status: current.status },
             data: {
               status: next,
               amount: SMS_DONATION_AMOUNT, // 항상 3,000원으로 보정
@@ -84,11 +92,31 @@ export async function POST(req: Request) {
           if (updated.count > 0) {
             await syncCampaignAmountOnStatusChange(
               tx,
-              { campaignId: donation.campaignId, amount: SMS_DONATION_AMOUNT, status: donation.status },
+              { campaignId: current.campaignId, amount: SMS_DONATION_AMOUNT, status: current.status },
               next
             );
           }
         });
+
+        // 이미 정산에 포함된 후원이 실패로 전환되면 정산 금액과 어긋난다 — 감사 로그로 보정 요청
+        if (next === "FAILED") {
+          const linked = await prisma.settlementItem.findUnique({
+            where: { donationId: donation.id },
+            select: { settlementId: true },
+          });
+          if (linked) {
+            console.error(
+              `[infobank-webhook] 정산 포함 후원(${donation.id})이 FAILED로 전환됨 — 정산(${linked.settlementId}) 금액 보정 필요`
+            );
+            await writeAuditLog({
+              userId: null,
+              action: "SETTLEMENT_ADJUST_REQUIRED",
+              entityType: "Settlement",
+              entityId: linked.settlementId,
+              detail: { donationId: donation.id, next, provider: "infobank" },
+            });
+          }
+        }
 
         // MT 발송 — 완료된 경우에만
         if (next === "COMPLETED" && senderPhone && mtSenderNumber) {
@@ -105,10 +133,14 @@ export async function POST(req: Request) {
         }
       } else {
         // 웹훅이 먼저 도착한 경우 — smsFullNumber로 기관을 찾아 바로 생성
-        const smsFullNumber = payload.smsFullNumber as string | undefined;
-        if (smsFullNumber && status === "COMPLETED") {
+        const smsFullNumberRaw = payload.smsFullNumber as string | undefined;
+        if (smsFullNumberRaw && status === "COMPLETED") {
+          // payload는 대시 없는 형식(#25401234)일 수 있고 DB는 대시 포함(#2540-1234)이다.
+          // EMMA 처리기(mo-processor)와 동일하게 정규화한 값도 함께 조회한다.
+          const normalized = smsFullNumberRaw.replace(/^(#\d{4})(?!-)(\d)/, "$1-$2");
+          const candidates = Array.from(new Set([smsFullNumberRaw, normalized]));
           const org = await prisma.organization.findFirst({
-            where: { smsFullNumber, deletedAt: null },
+            where: { smsFullNumber: { in: candidates }, deletedAt: null, isActive: true },
           });
           if (org) {
             // B-1: 이전 구현은 campaignId를 넣지 않고 생성한 뒤 newDonation.campaignId를

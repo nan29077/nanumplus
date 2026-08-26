@@ -52,7 +52,8 @@ export async function getDonationsOfDay(scope: Scope, dateStr: string) {
   const from = new Date(`${dateStr}T00:00:00+09:00`);
   const to = new Date(`${dateStr}T23:59:59.999+09:00`);
   return prisma.donation.findMany({
-    where: { ...scope, deletedAt: null, donatedAt: { gte: from, lte: to } },
+    // 월간 캘린더 셀 합계(COMPLETED만 집계)와 기준을 맞춘다
+    where: { ...scope, deletedAt: null, status: "COMPLETED", donatedAt: { gte: from, lte: to } },
     include: {
       donor: { select: { name: true, phone: true } },
       organization: { select: { name: true } },

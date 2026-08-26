@@ -8,8 +8,14 @@ export const dynamic = "force-dynamic";
 
 export default async function CampaignsPage() {
   const campaigns = await prisma.campaign.findMany({
-    where: { isPublished: true, deletedAt: null, status: { in: ["ACTIVE", "ENDED"] } },
-    include: { organization: { select: { name: true } }, _count: { select: { donations: true } } },
+    where: {
+      isPublished: true,
+      deletedAt: null,
+      status: { in: ["ACTIVE", "ENDED"] },
+      // 비활성·삭제된 기관의 캠페인은 공개 목록에서 제외 (홈 페이지 쿼리와 일치)
+      organization: { isActive: true, deletedAt: null },
+    },
+    include: { organization: { select: { name: true } }, _count: { select: { donations: { where: { status: "COMPLETED", deletedAt: null } } } } },
     orderBy: [{ status: "asc" }, { endDate: "asc" }],
   });
 

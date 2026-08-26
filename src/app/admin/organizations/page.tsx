@@ -27,7 +27,7 @@ export default async function AdminOrganizationsPage() {
         isActive: true,
         // 검색용 로그인 ID(기관 관리자 이메일)
         admins: { select: { user: { select: { email: true } } }, take: 1 },
-        _count: { select: { donors: true, campaigns: true } },
+        _count: { select: { donors: { where: { deletedAt: null } }, campaigns: { where: { deletedAt: null } } } },
       },
     }),
     prisma.donation.groupBy({

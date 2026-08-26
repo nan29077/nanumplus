@@ -27,7 +27,7 @@ export default async function OrgCampaignsPage({
         ...(status ? { status } : {}),
       },
       orderBy: { createdAt: "desc" },
-      include: { _count: { select: { donations: true } } },
+      include: { _count: { select: { donations: { where: { status: "COMPLETED", deletedAt: null } } } } },
     }),
   ]);
 

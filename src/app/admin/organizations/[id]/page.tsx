@@ -27,7 +27,7 @@ export default async function AdminOrganizationDetailPage({ params }: { params: 
       admins: { include: { user: { select: { name: true, email: true } } } },
       smsAssignments: { orderBy: { assignedAt: "desc" }, take: 5 },
       donations: { where: { status: "COMPLETED", deletedAt: null }, select: { amount: true } },
-      _count: { select: { donors: true, campaigns: true } },
+      _count: { select: { donors: { where: { deletedAt: null } }, campaigns: { where: { deletedAt: null } } } },
     },
   });
   if (!org) notFound();

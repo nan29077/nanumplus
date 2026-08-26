@@ -18,10 +18,12 @@ export default async function CampaignDetailPage({
     include: {
       organization: { include: { donationPage: true } },
       images: { orderBy: { sortOrder: "asc" } },
-      _count: { select: { donations: { where: { status: "COMPLETED" } } } },
+      _count: { select: { donations: { where: { status: "COMPLETED", deletedAt: null } } } },
     },
   });
   if (!campaign || !campaign.isPublished || campaign.deletedAt) notFound();
+  // 비활성·삭제된 기관의 캠페인은 공개하지 않는다 (/donate, /organizations 페이지와 동일 정책)
+  if (!campaign.organization.isActive || campaign.organization.deletedAt) notFound();
 
   const cfg = resolveDonationPage(campaign.organization.donationPage);
   // 캠페인이 허용 채널을 지정했으면 그것을, 아니면 기관 후원페이지 설정 채널을 사용

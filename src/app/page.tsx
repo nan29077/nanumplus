@@ -147,7 +147,7 @@ export default async function LandingPage() {
       logoUrl: true,
       description: true,
       address: true,
-      _count: { select: { donors: true } },
+      _count: { select: { donors: { where: { deletedAt: null } } } },
       campaigns: {
         where: { isPublished: true, deletedAt: null },
         select: { id: true },
@@ -164,7 +164,7 @@ export default async function LandingPage() {
     },
     include: {
       organization: { select: { name: true } },
-      _count: { select: { donations: true } },
+      _count: { select: { donations: { where: { status: "COMPLETED", deletedAt: null } } } },
     },
     orderBy: [{ status: "asc" }, { endDate: "asc" }],
     take: 6,

@@ -24,7 +24,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       admins: { include: { user: { select: { name: true, email: true, isActive: true } } } },
       smsAssignments: { orderBy: { assignedAt: "desc" } },
       qrCodes: { where: { isActive: true }, orderBy: { createdAt: "desc" }, take: 1 },
-      _count: { select: { donations: true, donors: true, campaigns: true } },
+      _count: { select: { donations: { where: { deletedAt: null } }, donors: { where: { deletedAt: null } }, campaigns: { where: { deletedAt: null } } } },
     },
   });
   if (!org) return Response.json({ error: "기관을 찾을 수 없습니다." }, { status: 404 });
@@ -76,17 +76,25 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   const org = await prisma.organization.findFirst({ where: { id: params.id, deletedAt: null } });
   if (!org) return Response.json({ error: "기관을 찾을 수 없습니다." }, { status: 404 });
 
-  await prisma.organization.update({
-    where: { id: params.id },
-    data: { deletedAt: new Date(), isActive: false },
-  });
+  // smsCode/smsFullNumber는 전역 unique이므로, 회수하지 않으면 삭제된 기관이
+  // 4자리 코드를 영구 점유해 다른 기관에 재배정할 수 없게 된다.
+  await prisma.$transaction([
+    prisma.organization.update({
+      where: { id: params.id },
+      data: { deletedAt: new Date(), isActive: false, smsCode: null, smsFullNumber: null },
+    }),
+    prisma.smsNumberAssignment.updateMany({
+      where: { organizationId: params.id, isActive: true },
+      data: { isActive: false, revokedAt: new Date() },
+    }),
+  ]);
 
   await writeAuditLog({
     userId: auth.user.id,
     action: "ORGANIZATION_DELETE",
     entityType: "Organization",
     entityId: org.id,
-    detail: { name: org.name },
+    detail: { name: org.name, revokedSmsCode: org.smsCode },
     ipAddress: getClientIp(req.headers),
   });
 

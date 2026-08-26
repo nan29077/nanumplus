@@ -34,7 +34,7 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     include: {
       admins: { include: { user: { select: { name: true, email: true } } } },
-      _count: { select: { donations: true, donors: true, campaigns: true } },
+      _count: { select: { donations: { where: { deletedAt: null } }, donors: { where: { deletedAt: null } }, campaigns: { where: { deletedAt: null } } } },
     },
   });
   return Response.json({ organizations: orgs });

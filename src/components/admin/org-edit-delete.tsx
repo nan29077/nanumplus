@@ -27,6 +27,7 @@ export function OrgEditDelete({
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState(initialName);
@@ -52,22 +53,33 @@ export function OrgEditDelete({
           isActive,
         }),
       });
-      const data = await res.json();
+      // 서버가 JSON이 아닌 오류 페이지를 반환해도 안전하게 처리
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "수정 실패"); return; }
       setEditOpen(false);
       router.refresh();
+    } catch {
+      setError("네트워크 오류로 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    const res = await fetch(`/api/admin/organizations/${orgId}`, { method: "DELETE" });
-    if (res.ok) {
-      router.push("/admin/organizations");
-    } else {
-      const data = await res.json();
-      alert(data.error ?? "삭제 실패");
+    if (deleting) return; // 더블클릭으로 DELETE가 중복 호출되지 않도록
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/organizations/${orgId}`, { method: "DELETE" });
+      if (res.ok) {
+        router.push("/admin/organizations");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "삭제 실패");
+      }
+    } catch {
+      alert("네트워크 오류로 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setDeleting(false);
     }
   };
 

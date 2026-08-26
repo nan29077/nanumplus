@@ -16,6 +16,7 @@
  * INFOBANK_PROVIDER=live 이고 EMMA_ID가 설정된 경우에만 실제 처리.
  */
 
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { processEmmaMo } from "@/lib/emma";
 
@@ -32,11 +33,19 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // 시크릿은 Authorization 헤더로만 받는다.
+  // (?secret= 쿼리 방식은 액세스 로그·프록시 로그에 평문으로 남아 제거)
   const authHeader = req.headers.get("authorization");
-  const querySecret = req.nextUrl.searchParams.get("secret");
-  const provided = authHeader?.replace("Bearer ", "") ?? querySecret ?? "";
+  const provided = authHeader?.replace("Bearer ", "") ?? "";
 
-  if (provided !== cronSecret) {
+  // 문자열 길이 비교로 끝나지 않도록 timing-safe 비교 (웹훅 핸들러와 동일 정책)
+  const providedBuf = Buffer.from(provided);
+  const secretBuf = Buffer.from(cronSecret);
+  const match =
+    providedBuf.length === secretBuf.length &&
+    timingSafeEqual(providedBuf, secretBuf);
+
+  if (!match) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 401 }

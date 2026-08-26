@@ -61,13 +61,17 @@ export async function POST(req: Request) {
       continue;
     }
     const amount = Number(r.amount);
-    if (!amount || amount <= 0) {
-      errors.push({ row: rowNum, message: `후원금액이 올바르지 않습니다. (${r.amount})` });
+    if (!Number.isInteger(amount) || amount <= 0 || amount > 100_000_000) {
+      errors.push({ row: rowNum, message: `후원금액이 올바르지 않습니다. (${r.amount}) — 1원 이상 1억원 이하 정수만 허용` });
       continue;
     }
     const donatedAt = r.donatedAt ? new Date(r.donatedAt) : null;
     if (!donatedAt || isNaN(donatedAt.getTime())) {
       errors.push({ row: rowNum, message: `후원일 '${r.donatedAt}'이 올바르지 않습니다.` });
+      continue;
+    }
+    if (donatedAt.getTime() > Date.now() + 86_400_000) {
+      errors.push({ row: rowNum, message: `후원일 '${r.donatedAt}'이 미래 날짜입니다.` });
       continue;
     }
     const status = VALID_STATUSES.includes((r.status ?? "").toUpperCase())

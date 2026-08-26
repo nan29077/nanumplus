@@ -40,7 +40,7 @@ export async function GET() {
       const exists = await client.$queryRawUnsafe<[{ exists: boolean }]>(
         `SELECT EXISTS (
            SELECT 1 FROM information_schema.tables
-           WHERE table_name = $1
+           WHERE table_schema = 'public' AND table_name = $1
          ) AS exists`,
         moTable
       );
@@ -50,9 +50,9 @@ export async function GET() {
         continue;
       }
 
-      // 미처리 건수 (msg_status='3')
+      // 미처리 건수 — 처리기(mo-processor)와 동일하게 '3'(수신)과 '0'(초기) 모두 집계
       const unprocessed = await client.$queryRawUnsafe<[{ count: bigint }]>(
-        `SELECT COUNT(*) AS count FROM ${moTable} WHERE msg_status = '3'`
+        `SELECT COUNT(*) AS count FROM ${moTable} WHERE msg_status IN ('3', '0')`
       );
 
       // 최근 5건 (처리 여부 무관)
@@ -90,7 +90,8 @@ export async function GET() {
     try {
       const mtExists = await client.$queryRawUnsafe<[{ exists: boolean }]>(
         `SELECT EXISTS (
-           SELECT 1 FROM information_schema.tables WHERE table_name = $1
+           SELECT 1 FROM information_schema.tables
+           WHERE table_schema = 'public' AND table_name = $1
          ) AS exists`,
         mtTable
       );
@@ -124,7 +125,7 @@ export async function GET() {
     try {
       const pgExists = await postgresClient.$queryRawUnsafe<[{ exists: boolean }]>(
         `SELECT EXISTS (
-           SELECT 1 FROM information_schema.tables WHERE table_name = $1
+           SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1
          ) AS exists`,
         `em_mo_log_${suffix}`
       );

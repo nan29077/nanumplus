@@ -39,6 +39,8 @@ export function DonorMyClient({
       const res = await fetch(`/api/donor/recurring/${id}/cancel`, { method: "POST" });
       if (!res.ok) alert("해지에 실패했습니다. 잠시 후 다시 시도해 주세요.");
       else router.refresh();
+    } catch {
+      alert("네트워크 오류로 해지에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally { setBusyId(null); }
   };
   const deleteCard = async (id: string) => {
@@ -48,6 +50,8 @@ export function DonorMyClient({
       const res = await fetch(`/api/donor/billing/${id}`, { method: "DELETE" });
       if (!res.ok) alert("삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.");
       else router.refresh();
+    } catch {
+      alert("네트워크 오류로 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally { setBusyId(null); }
   };
 

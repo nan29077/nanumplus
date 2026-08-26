@@ -14,7 +14,8 @@ import { findOrCreateDonor } from "@/lib/donor";
  */
 export async function POST(req: Request) {
   const ip = getClientIp(req.headers);
-  if (!rateLimit(`transfer-init:${ip}`, 20, 60_000)) {
+  // IP별 제한 + 전역 제한 (X-Forwarded-For 스푸핑 우회 대비)
+  if (!rateLimit(`transfer-init:${ip}`, 20, 60_000) || !rateLimit("transfer-init:all", 300, 60_000)) {
     return Response.json({ error: "요청이 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
 

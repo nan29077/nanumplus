@@ -16,7 +16,7 @@ export default async function OrganizationsPage() {
       logoUrl: true,
       description: true,
       address: true,
-      _count: { select: { donors: true } },
+      _count: { select: { donors: { where: { deletedAt: null } } } },
       campaigns: {
         where: { isPublished: true, deletedAt: null },
         select: { id: true },

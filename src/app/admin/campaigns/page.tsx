@@ -25,7 +25,7 @@ export default async function AdminCampaignsPage({
     orderBy: { createdAt: "desc" },
     include: {
       organization: { select: { name: true } },
-      _count: { select: { donations: true } },
+      _count: { select: { donations: { where: { status: "COMPLETED", deletedAt: null } } } },
     },
   });
 

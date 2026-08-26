@@ -109,6 +109,8 @@ export function AdminSettlementClient({
       } else {
         alert(data.error ?? "생성 중 오류가 발생했습니다.");
       }
+    } catch {
+      alert("네트워크 오류로 정산 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setGenerating(false);
     }
@@ -126,10 +128,18 @@ export function AdminSettlementClient({
       });
       const data = await res.json();
       if (data.ok) {
+        // 서버의 최신 note가 화면에 반영되도록 로컬 입력값을 비운다 (stale state 방지)
+        setNoteMap((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
         router.refresh();
       } else {
         alert(data.error ?? "처리 중 오류가 발생했습니다.");
       }
+    } catch {
+      alert("네트워크 오류로 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setProcessingId(null);
     }
@@ -144,16 +154,25 @@ export function AdminSettlementClient({
         (s) => s.period === period && (s.status === "PENDING" || s.status === "PROCESSING")
       );
       let success = 0;
+      let failed = 0;
       for (const s of targets) {
-        const res = await fetch(`/api/admin/settlements/${s.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "COMPLETED", note: `일괄 정산 완료 처리 (${periodLabel})` }),
-        });
-        const data = await res.json();
-        if (data.ok) success++;
+        try {
+          const res = await fetch(`/api/admin/settlements/${s.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "COMPLETED", note: `일괄 정산 완료 처리 (${periodLabel})` }),
+          });
+          const data = await res.json();
+          if (data.ok) success++;
+          else failed++;
+        } catch {
+          failed++;
+        }
       }
-      alert(`${periodLabel} 정산 ${success}건 완료 처리되었습니다.`);
+      alert(
+        `${periodLabel} 정산 ${success}건 완료 처리되었습니다.` +
+          (failed > 0 ? ` (실패 ${failed}건 — 목록을 확인해 주세요)` : "")
+      );
       router.refresh();
     } finally {
       setBatchProcessingPeriod(null);

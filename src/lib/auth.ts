@@ -130,6 +130,17 @@ export const authOptions: NextAuthOptions = {
       // OAuth = 후원자. DonorAccount upsert.
       if (account?.type === "oauth") {
         if (!account.providerAccountId) return false;
+        // 삭제 처리된 후원자 계정은 로그인 차단 (upsert가 계정을 되살리지 않도록 선검사)
+        const existing = await prisma.donorAccount.findUnique({
+          where: {
+            provider_providerId: {
+              provider: account.provider,
+              providerId: account.providerAccountId,
+            },
+          },
+          select: { deletedAt: true },
+        });
+        if (existing?.deletedAt) return false;
         await prisma.donorAccount.upsert({
           where: {
             provider_providerId: {

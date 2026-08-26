@@ -12,7 +12,9 @@ import { checkDonationPolicy } from "@/lib/channel-policy";
  */
 export async function POST(req: Request) {
   const ip = getClientIp(req.headers);
-  if (!rateLimit(`sms-init:${ip}`, 30, 60_000)) {
+  // IP별 제한 + 전역 제한 — X-Forwarded-For 스푸핑으로 IP별 제한을 우회해도
+  // 인증 없는 PENDING 레코드 대량 생성이 불가능하도록 총량을 함께 제한한다.
+  if (!rateLimit(`sms-init:${ip}`, 30, 60_000) || !rateLimit("sms-init:all", 300, 60_000)) {
     return Response.json({ error: "요청이 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
 

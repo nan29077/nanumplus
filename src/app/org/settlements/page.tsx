@@ -94,7 +94,14 @@ export default async function OrgSettlementsPage({
   const totalCompleted = settlements
     .filter((s: { status: string }) => s.status === "COMPLETED")
     .reduce((sum: number, s: { netAmount: number }) => sum + s.netAmount, 0);
-  const nextSettlement = settlements.find((s: { status: string }) => s.status === "PENDING");
+  // 목록이 scheduledDate 내림차순이므로 find()는 "가장 늦은" 예정일을 집는다.
+  // 다음 정산 예정일은 PENDING 중 가장 가까운(이른) 날짜여야 한다.
+  const nextSettlement = settlements
+    .filter((s: { status: string }) => s.status === "PENDING")
+    .reduce<(typeof settlements)[number] | undefined>(
+      (min, s) => (!min || s.scheduledDate < min.scheduledDate ? s : min),
+      undefined
+    );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const serialized = settlements.map((s: any) => ({

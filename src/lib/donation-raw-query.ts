@@ -29,7 +29,7 @@ export async function fetchAllDonations(
         AND (${orgId}::text IS NULL OR d."organizationId" = ${orgId})
         AND (${channel}::text IS NULL OR d.channel = ${channel}::"DonationChannel")
         AND (${status}::text IS NULL OR d.status = ${status}::"DonationStatus")
-      ORDER BY d."donatedAt" DESC
+      ORDER BY d."donatedAt" DESC, d.id DESC
       LIMIT ${take} OFFSET ${skip}
     `),
     prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`

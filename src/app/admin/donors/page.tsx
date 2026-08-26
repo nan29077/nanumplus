@@ -3,6 +3,7 @@ import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { parsePageParam } from "@/lib/utils";
 import { fmtKst } from "@/lib/kst-date";
+import { maskPhone, maskEmail } from "@/lib/masking";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { DonorTable, type DonorRow } from "@/components/donation/donor-table";
@@ -37,8 +38,9 @@ export default async function AdminDonorsPage({ searchParams }: { searchParams: 
   const rows: DonorRow[] = donors.map((d) => ({
     id: d.id,
     name: d.name,
-    phone: d.phone,
-    email: d.email,
+    // 원본 연락처가 RSC 직렬화로 브라우저에 노출되지 않도록 서버에서 마스킹
+    phone: d.phone ? maskPhone(d.phone) : null,
+    email: d.email ? maskEmail(d.email) : null,
     isRecurring: d.isRecurring,
     memo: d.organization ? `소속 기관: ${d.organization.name}${d.memo ? ` · ${d.memo}` : ""}` : d.memo,
     totalAmount: d.donations.reduce((s: number, x: { amount: number }) => s + x.amount, 0),

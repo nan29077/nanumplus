@@ -31,7 +31,8 @@ export function FilterBar({
     { value: "", label: "전체 채널" },
     { value: "SMS", label: "문자후원" },
     { value: "EASY_TRANSFER", label: "간편 계좌이체" },
-    { value: "RECURRING_TRANSFER", label: "정기후원" },
+    { value: "RECURRING_TRANSFER", label: "정기 계좌후원" },
+    { value: "RECURRING_CARD", label: "카드 정기후원" },
   ];
   const statuses: Opt[] = [
     { value: "", label: "전체 상태" },

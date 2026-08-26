@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     // 테이블 없으면 먼저 생성
     const exists = await client.$queryRawUnsafe<[{ exists: boolean }]>(
-      `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = $1) AS exists`,
+      `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1) AS exists`,
       moTable
     );
     if (!exists[0].exists) {

@@ -56,7 +56,7 @@ export default async function AdminEmmaSettingsPage() {
   try {
     const exists = await emmaClient.$queryRawUnsafe<[{ exists: boolean }]>(
       `SELECT EXISTS (
-         SELECT 1 FROM information_schema.tables WHERE table_name = $1
+         SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1
        ) AS exists`,
       `em_mo_log_${suffix}`
     );

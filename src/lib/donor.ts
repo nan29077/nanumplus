@@ -85,7 +85,21 @@ export async function findOrCreateDonor(db: DbClient, input: FindOrCreateDonorIn
     if (input.isRecurring && !existing.isRecurring) patch.isRecurring = true;
     if (input.privacyConsent && !existing.privacyConsent) patch.privacyConsent = true;
     if (input.donorAccountId && !existing.donorAccountId) {
-      patch.donorAccount = { connect: { id: input.donorAccountId } };
+      // 요청 body의 전화·이메일은 소유 검증이 없는 값이므로, 이것만 믿고 기존
+      // Donor를 로그인 계정에 연결하면 타인의 후원자 레코드를 자기 계정에
+      // 묶을 수 있다(계정 연계 탈취). 로그인 계정(DonorAccount)에 등록된
+      // 연락처와 실제로 일치할 때만 연결한다.
+      const account = await db.donorAccount.findUnique({
+        where: { id: input.donorAccountId },
+        select: { phone: true, email: true },
+      });
+      const accountPhone = normalizePhone(account?.phone);
+      const accountEmail = (account?.email ?? "").trim().toLowerCase();
+      const phoneMatches = !!accountPhone && !!normalized && accountPhone === normalized;
+      const emailMatches = !!accountEmail && !!email && accountEmail === email.toLowerCase();
+      if (phoneMatches || emailMatches) {
+        patch.donorAccount = { connect: { id: input.donorAccountId } };
+      }
     }
     if (Object.keys(patch).length > 0) {
       await db.donor.update({ where: { id: existing.id }, data: patch });

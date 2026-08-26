@@ -5,6 +5,7 @@ import { requireOrgAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { parsePageParam, formatKRW } from "@/lib/utils";
 import { fmtKst, kstToUtc, nowKst } from "@/lib/kst-date";
+import { maskPhone, maskEmail } from "@/lib/masking";
 import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { DonorTable, type DonorRow } from "@/components/donation/donor-table";
@@ -95,8 +96,9 @@ export default async function OrgDonorsPage({ searchParams }: { searchParams: { 
     return {
       id: d.id,
       name: d.name,
-      phone: d.phone,
-      email: d.email,
+      // 원본 연락처가 RSC 직렬화로 브라우저에 노출되지 않도록 서버에서 마스킹
+      phone: d.phone ? maskPhone(d.phone) : null,
+      email: d.email ? maskEmail(d.email) : null,
       isRecurring: d.isRecurring,
       isLinked: !!d.donorAccountId,
       memo: d.memo,

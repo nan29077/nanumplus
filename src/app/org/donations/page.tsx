@@ -1,6 +1,6 @@
 import { requireOrgAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { parsePageParam } from "@/lib/utils";
+import { parsePageParam, parseStatusParam } from "@/lib/utils";
 import type { Prisma } from "@prisma/client";
 import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
@@ -17,17 +17,23 @@ export default async function OrgDonationsPage({
   const page = parsePageParam(searchParams.page);
   const take = 20;
 
+  // 화이트리스트 검증 — 잘못된 쿼리 값이 Prisma enum 오류(서버 500)를 내지 않도록
+  const channel = parseStatusParam(searchParams.channel,
+    ["SMS", "EASY_TRANSFER", "RECURRING_TRANSFER", "RECURRING_CARD"] as const);
+  const status = parseStatusParam(searchParams.status,
+    ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED"] as const);
+
   const where: Prisma.DonationWhereInput = {
     organizationId: user.organizationId,
     deletedAt: null,
-    ...(searchParams.channel ? { channel: searchParams.channel as Prisma.DonationWhereInput["channel"] } : {}),
-    ...(searchParams.status ? { status: searchParams.status as Prisma.DonationWhereInput["status"] } : {}),
+    ...(channel ? { channel } : {}),
+    ...(status ? { status } : {}),
   };
 
   const [org, rows, total] = await Promise.all([
     prisma.organization.findUnique({ where: { id: user.organizationId }, select: { name: true } }),
     prisma.donation.findMany({
-      where, orderBy: { donatedAt: "desc" }, skip: (page - 1) * take, take,
+      where, orderBy: [{ donatedAt: "desc" }, { id: "desc" }], skip: (page - 1) * take, take,
       include: { donor: { select: { name: true } }, campaign: { select: { title: true } } },
     }),
     prisma.donation.count({ where }),
