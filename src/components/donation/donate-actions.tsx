@@ -49,9 +49,9 @@ export function DonateActions({
   };
 
   const cols = Math.min(enabledChannels.length, 4);
+  const smCols = cols <= 2 ? "sm:grid-cols-2" : cols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-4";
   const buttons = (
-    <div className={cn("grid gap-2.5", sticky ? "" : "mt-5")}
-      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+    <div className={cn("grid grid-cols-2 gap-2.5", smCols, sticky ? "" : "mt-5")}>
       {enabledChannels.map((ch) => {
         const Icon = CHANNEL_ICON[ch];
         return (
@@ -122,14 +122,21 @@ function Modal({ title, onClose, children }: {
   );
 }
 
+const SMS_PRESETS = ["후원합니다", "함께하겠습니다", "응원합니다", "사랑을 전합니다"];
+
 function SmsPanel({ smsNumber, orgName, orgId, themeColor }: {
   smsNumber: string | null; orgName: string; orgId: string; themeColor: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const [preset, setPreset] = useState(0); // 0~3 프리셋, 4 = 직접입력
+  const [custom, setCustom] = useState("");
+
   if (!smsNumber) {
     return <p className="text-sm text-stone-500">이 기관에는 아직 문자후원 번호가 부여되지 않았습니다.</p>;
   }
-  const smsHref = `sms:${smsNumber.replace("#", "%23")}?body=${encodeURIComponent("후원합니다")}`;
+
+  const message = preset === 4 ? (custom.trim() || "후원합니다") : SMS_PRESETS[preset];
+  const smsHref = `sms:${smsNumber.replace("#", "%23")}?body=${encodeURIComponent(message)}`;
 
   const init = () => {
     fetch("/api/donations/sms/init", {
@@ -142,35 +149,53 @@ function SmsPanel({ smsNumber, orgName, orgId, themeColor }: {
   return (
     <div>
       <p className="text-sm leading-relaxed text-stone-500">
-        아래 번호로 문자를 보내면 {orgName}에 후원이 전달됩니다.
+        보낼 문구를 고르면 {orgName}의 문자후원 번호로 문자 앱이 열립니다.
         후원금은 휴대폰 요금에 합산 청구됩니다.
       </p>
+
+      {/* 수신 번호 */}
       <div className="mt-4 flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-4">
         <span className="text-xl font-bold tracking-wide" style={{ color: themeColor }}>{smsNumber}</span>
         <button
-          onClick={() => {
-            navigator.clipboard?.writeText(smsNumber);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          }}
-          className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
-        >
-          <Copy className="h-3.5 w-3.5" strokeWidth={1.75} />
-          {copied ? "복사됨" : "복사"}
+          onClick={() => { navigator.clipboard?.writeText(smsNumber); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+          className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50">
+          <Copy className="h-3.5 w-3.5" strokeWidth={1.75} /> {copied ? "복사됨" : "복사"}
         </button>
       </div>
-      {/* 모바일 전용: 문자 앱 열기 (PC에서는 숨김) */}
-      <a
-        href={smsHref}
-        onClick={init}
-        style={{ backgroundColor: themeColor }}
-        className="mt-4 block rounded-xl py-3 text-center text-sm font-semibold text-white hover:brightness-95 sm:hidden"
-      >
-        문자 앱 열기
+
+      {/* 문구 선택 */}
+      <p className="mt-4 text-sm font-medium text-stone-700">보낼 문구 선택</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {SMS_PRESETS.map((m, i) => (
+          <button key={m} type="button" onClick={() => setPreset(i)}
+            style={preset === i ? { borderColor: themeColor, color: themeColor, backgroundColor: `${themeColor}14` } : {}}
+            className={cn("rounded-xl border py-2.5 text-sm", preset === i ? "font-semibold" : "border-stone-200 text-stone-600")}>
+            {m}
+          </button>
+        ))}
+        <button type="button" onClick={() => setPreset(4)}
+          style={preset === 4 ? { borderColor: themeColor, color: themeColor, backgroundColor: `${themeColor}14` } : {}}
+          className={cn("col-span-2 rounded-xl border py-2.5 text-sm", preset === 4 ? "font-semibold" : "border-stone-200 text-stone-600")}>
+          직접 입력
+        </button>
+      </div>
+      {preset === 4 && (
+        <input value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={40}
+          placeholder="보낼 문구를 입력하세요"
+          className="mt-2 w-full rounded-xl border border-stone-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500" />
+      )}
+
+      {/* 모바일 전용: 문자 앱 열기 */}
+      <a href={smsHref} onClick={init} style={{ backgroundColor: themeColor }}
+        className="mt-4 block rounded-xl py-3 text-center text-sm font-semibold text-white hover:brightness-95 sm:hidden">
+        「{message}」 문자 보내기
       </a>
-      <p className="mt-3 text-xs leading-relaxed text-stone-400">
-        모바일에서는 위 버튼으로 문자 앱이 바로 열립니다.
-        데스크톱에서는 휴대폰에서 위 번호로 문자를 보내 주세요.
+      <p className="mt-3 hidden rounded-xl bg-stone-50 px-3 py-2.5 text-xs leading-relaxed text-stone-500 sm:block">
+        문자후원은 <b>모바일에서만</b> 이용할 수 있습니다. 휴대폰에서 위 번호(<b>{smsNumber}</b>)로
+        「{message}」를 보내 주세요.
+      </p>
+      <p className="mt-2 text-[11px] leading-relaxed text-stone-400 sm:hidden">
+        버튼을 누르면 수신번호와 문구가 채워진 상태로 문자 앱이 열립니다. (일부 기기는 문구가 자동입력되지 않을 수 있어요)
       </p>
     </div>
   );
@@ -223,9 +248,14 @@ function DonationForm({
           ...(recurring ? { dayOfMonth } : {}),
         }),
       });
+      const resBody = await res.json().catch(() => null);
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        setError(body?.error ?? "후원 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+        setError(resBody?.error ?? "후원 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      // 온기 계좌이체(라이브): 결제창으로 이동
+      if (resBody?.redirectUrl) {
+        window.location.href = resBody.redirectUrl as string;
         return;
       }
       setDone(true);
@@ -328,8 +358,8 @@ function DonationForm({
       </button>
       <p className="text-center text-[11px] text-stone-400">
         {kind === "card"
-          ? "핵토 빌링키 자동결제로 처리됩니다 (현재 Mock 연동)"
-          : "핵토 내통장결제로 안전하게 처리됩니다 (현재 Mock 연동)"}
+          ? "핵토파이낸셜 빌링키 자동결제로 처리됩니다"
+          : "온기(핵토파이낸셜) 내통장결제로 안전하게 처리됩니다"}
       </p>
     </form>
   );

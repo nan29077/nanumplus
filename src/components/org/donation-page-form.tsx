@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Save, Loader2, Check, Plus, Trash2, ArrowUp, ArrowDown, ExternalLink,
-  Type, Quote, Image as ImageIcon,
+  Type, Quote, Image as ImageIcon, Link2, Plus as PlusIcon,
 } from "lucide-react";
 import {
   ALL_CHANNELS, CHANNEL_META, type DonationChannelKey,
   type DonationPageConfig, type StoryBlock,
+  LINK_TYPES, LINK_TYPE_LABELS, type LinkButton, type LinkButtonType,
 } from "@/lib/donation-page";
 import { formatKRW } from "@/lib/utils";
 
@@ -72,6 +73,14 @@ export function DonationPageForm({
     set("blocks", next);
   };
 
+  const addLink = () => {
+    if (c.links.length >= 8) return;
+    set("links", [...c.links, { label: "", url: "", type: "home" as LinkButtonType }]);
+  };
+  const updateLink = (i: number, patch: Partial<LinkButton>) =>
+    set("links", c.links.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  const removeLink = (i: number) => set("links", c.links.filter((_, idx) => idx !== i));
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -85,6 +94,8 @@ export function DonationPageForm({
           heroImageUrl: c.heroImageUrl ?? "",
           heroTitle: c.heroTitle ?? "",
           heroSubtitle: c.heroSubtitle ?? "",
+          logoUrl: c.logoUrl ?? "",
+          links: c.links,
           introTitle: c.introTitle ?? "",
           introBody: c.introBody ?? "",
           blocks: c.blocks,
@@ -95,6 +106,7 @@ export function DonationPageForm({
           showStats: c.showStats,
           showCampaigns: c.showCampaigns,
           showFaq: c.showFaq,
+          showSmsFeed: c.showSmsFeed,
           isPublished: c.isPublished,
         }),
       });
@@ -154,6 +166,11 @@ export function DonationPageForm({
           <input value={c.heroImageUrl ?? ""} onChange={(e) => set("heroImageUrl", e.target.value || null)}
             placeholder="https://..." className={field} />
         </div>
+        <div>
+          <label className={labelCls}>로고 이미지 URL (좌측 상단)</label>
+          <input value={c.logoUrl ?? ""} onChange={(e) => set("logoUrl", e.target.value || null)}
+            placeholder="비우면 기관 기본 로고가 표시됩니다" className={field} />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelCls}>대표 문구</label>
@@ -165,6 +182,40 @@ export function DonationPageForm({
             <input value={c.heroSubtitle ?? ""} onChange={(e) => set("heroSubtitle", e.target.value || null)}
               placeholder="예: 작은 나눔이 큰 변화를 만듭니다" className={field} />
           </div>
+        </div>
+      </div>
+
+      {/* 링크 버튼 (홈페이지·SNS) */}
+      <div className={card}>
+        <div className="flex items-center justify-between">
+          <p className={sectionTitle}>링크 버튼 (홈페이지·SNS)</p>
+          <button type="button" onClick={addLink}
+            className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50">
+            <PlusIcon className="h-3.5 w-3.5" /> 링크 추가
+          </button>
+        </div>
+        {c.links.length === 0 && (
+          <p className="rounded-xl bg-stone-50 px-4 py-5 text-center text-sm text-stone-400">
+            기관 홈페이지·SNS 링크를 추가하세요. 후원페이지에서 <b>새 탭</b>으로 열립니다.
+          </p>
+        )}
+        <div className="space-y-2.5">
+          {c.links.map((l, i) => (
+            <div key={i} className="flex flex-wrap items-center gap-2">
+              <Link2 className="h-4 w-4 shrink-0 text-stone-300" />
+              <select value={l.type} onChange={(e) => updateLink(i, { type: e.target.value as LinkButtonType })}
+                className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500">
+                {LINK_TYPES.map((t) => <option key={t} value={t}>{LINK_TYPE_LABELS[t]}</option>)}
+              </select>
+              <input value={l.label} onChange={(e) => updateLink(i, { label: e.target.value })}
+                placeholder="버튼 이름" className="w-28 rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+              <input value={l.url} onChange={(e) => updateLink(i, { url: e.target.value })}
+                placeholder="https://..." className="min-w-[8rem] flex-1 rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+              <button type="button" onClick={() => removeLink(i)} className="rounded-lg p-2 text-rose-400 hover:bg-rose-50">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -308,10 +359,11 @@ export function DonationPageForm({
           <textarea rows={2} value={c.thankYouMessage ?? ""} onChange={(e) => set("thankYouMessage", e.target.value || null)}
             className={field} />
         </div>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-4">
           {[
             { k: "showStats" as const, label: "모금 현황 표시" },
             { k: "showCampaigns" as const, label: "진행 캠페인 표시" },
+            { k: "showSmsFeed" as const, label: "문자후원 내역" },
             { k: "showFaq" as const, label: "자주 묻는 질문" },
           ].map((t) => (
             <label key={t.k} className="flex items-center gap-2 rounded-xl border border-stone-200 p-3 text-sm">

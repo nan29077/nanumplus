@@ -35,11 +35,25 @@ export type StoryBlock =
   | { type: "image"; imageUrl: string; caption?: string }
   | { type: "quote"; body: string; author?: string };
 
+export type LinkButtonType = "home" | "instagram" | "youtube" | "facebook" | "blog" | "link";
+export type LinkButton = { label: string; url: string; type: LinkButtonType };
+export const LINK_TYPES: LinkButtonType[] = ["home", "instagram", "youtube", "facebook", "blog", "link"];
+export const LINK_TYPE_LABELS: Record<LinkButtonType, string> = {
+  home: "홈페이지",
+  instagram: "인스타그램",
+  youtube: "유튜브",
+  facebook: "페이스북",
+  blog: "블로그",
+  link: "기타 링크",
+};
+
 export type DonationPageConfig = {
   themeColor: string;
   heroImageUrl: string | null;
   heroTitle: string | null;
   heroSubtitle: string | null;
+  logoUrl: string | null;
+  links: LinkButton[];
   introTitle: string | null;
   introBody: string | null;
   blocks: StoryBlock[];
@@ -50,6 +64,7 @@ export type DonationPageConfig = {
   showStats: boolean;
   showCampaigns: boolean;
   showFaq: boolean;
+  showSmsFeed: boolean;
   isPublished: boolean;
 };
 
@@ -59,6 +74,8 @@ export type DonationPageRow = {
   heroImageUrl?: string | null;
   heroTitle?: string | null;
   heroSubtitle?: string | null;
+  logoUrl?: string | null;
+  links?: string | null;
   introTitle?: string | null;
   introBody?: string | null;
   blocks?: string | null;
@@ -69,6 +86,7 @@ export type DonationPageRow = {
   showStats?: boolean | null;
   showCampaigns?: boolean | null;
   showFaq?: boolean | null;
+  showSmsFeed?: boolean | null;
   isPublished?: boolean | null;
 };
 
@@ -116,6 +134,26 @@ function normalizeBlocks(input: unknown): StoryBlock[] {
   return out;
 }
 
+function normalizeLinks(input: unknown): LinkButton[] {
+  if (!Array.isArray(input)) return [];
+  const types = new Set(LINK_TYPES as string[]);
+  const out: LinkButton[] = [];
+  for (const l of input) {
+    if (!l || typeof l !== "object") continue;
+    const url = (l as { url?: unknown }).url;
+    const label = (l as { label?: unknown }).label;
+    const type = (l as { type?: unknown }).type;
+    if (typeof url !== "string" || !url) continue;
+    out.push({
+      label: typeof label === "string" && label ? label : "바로가기",
+      url,
+      type: (typeof type === "string" && types.has(type) ? type : "link") as LinkButtonType,
+    });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 /** 저장된 행(또는 null)을 화면/폼에서 쓰기 좋은 설정 객체로 변환 */
 export function resolveDonationPage(row: DonationPageRow | null | undefined): DonationPageConfig {
   return {
@@ -123,6 +161,8 @@ export function resolveDonationPage(row: DonationPageRow | null | undefined): Do
     heroImageUrl: row?.heroImageUrl || null,
     heroTitle: row?.heroTitle || null,
     heroSubtitle: row?.heroSubtitle || null,
+    logoUrl: row?.logoUrl || null,
+    links: normalizeLinks(safeParse<unknown>(row?.links, [])),
     introTitle: row?.introTitle || null,
     introBody: row?.introBody || null,
     blocks: normalizeBlocks(safeParse<unknown>(row?.blocks, [])),
@@ -133,6 +173,7 @@ export function resolveDonationPage(row: DonationPageRow | null | undefined): Do
     showStats: row?.showStats ?? true,
     showCampaigns: row?.showCampaigns ?? true,
     showFaq: row?.showFaq ?? false,
+    showSmsFeed: row?.showSmsFeed ?? true,
     isPublished: row?.isPublished ?? true,
   };
 }

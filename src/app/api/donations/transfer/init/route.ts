@@ -1,30 +1,25 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getTransferAdapter } from "@/lib/adapters";
 import { rateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
 import { getClientIp, transferInitSchema } from "@/lib/validation";
 import { getDonorSession } from "@/lib/donor-auth";
-import { checkDonationPolicy } from "@/lib/channel-policy";
-import { findOrCreateDonor } from "@/lib/donor";
+import { ongiIsLive, signRef, buildOngiPaymentUrl, appBaseUrl } from "@/lib/ongi";
 
 /**
- * 온기 간편 계좌이체 후원.
- * Mock 어댑터는 즉시 COMPLETED 를 반환하므로 후원 레코드를 완료 상태로 생성한다.
+ * 간편 계좌이체 후원 (온기 내통장결제).
+ * - 라이브(ONGI_PROVIDER=live): PENDING 후원 생성 후 온기 결제창 URL(redirectUrl)을 반환.
+ *   완료는 /api/webhooks/ongi 콜백으로 확정.
+ * - Mock: 즉시 COMPLETED 처리(개발용).
  */
 export async function POST(req: Request) {
   const ip = getClientIp(req.headers);
-  // IP별 제한 + 전역 제한 (X-Forwarded-For 스푸핑 우회 대비)
-  if (!rateLimit(`transfer-init:${ip}`, 20, 60_000) || !rateLimit("transfer-init:all", 300, 60_000)) {
+  if (!rateLimit(`transfer-init:${ip}`, 20, 60_000)) {
     return Response.json({ error: "요청이 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
 
   let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "잘못된 요청입니다." }, { status: 400 });
-  }
+  try { body = await req.json(); } catch { return Response.json({ error: "잘못된 요청입니다." }, { status: 400 }); }
 
   const parsed = transferInitSchema.safeParse(body);
   if (!parsed.success) {
@@ -34,64 +29,69 @@ export async function POST(req: Request) {
   const donorSession = await getDonorSession();
 
   const org = await prisma.organization.findFirst({
-    where: { slug: parsed.data.organizationSlug, isActive: true, deletedAt: null },
+    where: { slug: data.organizationSlug, isActive: true, deletedAt: null },
   });
   if (!org) return Response.json({ error: "기관을 찾을 수 없습니다." }, { status: 404 });
 
-  // H-2: 기관 채널 정책 · 캠페인 상태/기간/허용채널 서버 검증
-  const policy = await checkDonationPolicy({
-    organizationId: org.id,
-    channel: "EASY_TRANSFER",
-    campaignSlug: data.campaignSlug,
-  });
-  if (!policy.ok) return Response.json({ error: policy.error }, { status: policy.status });
-  const campaignId = policy.campaignId;
-
-  const adapter = getTransferAdapter();
-  const result = await adapter.initEasyTransfer({
-    organizationId: org.id,
-    amount: data.amount,
-    donorName: sanitizeText(data.donorName, 40),
-    donorPhone: data.donorPhone || undefined,
-    donorEmail: data.donorEmail || undefined,
-    campaignId: campaignId ?? undefined,
-  });
-  if (!result.ok) {
-    return Response.json({ error: result.message }, { status: 400 });
+  let campaignId: string | null = null;
+  if (data.campaignSlug) {
+    const campaign = await prisma.campaign.findFirst({
+      where: { slug: data.campaignSlug, organizationId: org.id, deletedAt: null },
+      select: { id: true },
+    });
+    campaignId = campaign?.id ?? null;
   }
 
-  const status = result.data.status === "COMPLETED" ? "COMPLETED" : "PENDING";
+  const live = ongiIsLive();
+  const name = sanitizeText(data.donorName, 40);
 
-  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    // H-1: 전화번호·이메일로 기존 후원자를 먼저 찾고, 없을 때만 생성
-    const donorId = await findOrCreateDonor(tx, {
-      organizationId: org.id,
-      name: sanitizeText(data.donorName, 40),
-      phone: data.donorPhone || null,
-      email: data.donorEmail || null,
-      privacyConsent: true,
-      donorAccountId: donorSession?.donorAccountId ?? null,
-    });
-    await tx.donation.create({
+  // 후원자 + 후원(초기 상태) 생성
+  const donationId = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const donor = await tx.donor.create({
       data: {
         organizationId: org.id,
-        donorId,
+        name,
+        phone: data.donorPhone || null,
+        email: data.donorEmail || null,
+        privacyConsent: true,
+        donorAccountId: donorSession?.donorAccountId ?? null,
+      },
+    });
+    const donation = await tx.donation.create({
+      data: {
+        organizationId: org.id,
+        donorId: donor.id,
         donorAccountId: donorSession?.donorAccountId ?? null,
         campaignId,
         channel: "EASY_TRANSFER",
         amount: data.amount,
-        status,
-        providerName: adapter.providerName,
-        providerTransactionId: result.data.providerTransactionId,
+        status: live ? "PENDING" : "COMPLETED",
+        providerName: "ongi",
+        memo: live ? "온기 결제창 대기" : "Mock 즉시 완료",
       },
     });
-    if (campaignId && status === "COMPLETED") {
-      await tx.campaign.update({
-        where: { id: campaignId },
-        data: { currentAmount: { increment: data.amount } },
-      });
+    // Mock 즉시 완료면 캠페인 반영
+    if (!live && campaignId) {
+      await tx.campaign.update({ where: { id: campaignId }, data: { currentAmount: { increment: data.amount } } });
     }
+    return donation.id;
   });
 
-  return Response.json({ ok: true, status });
+  if (live) {
+    const base = appBaseUrl();
+    const ref = donationId;
+    const sig = signRef(ref);
+    const callbackUrl = `${base}/api/webhooks/ongi?ref=${encodeURIComponent(ref)}&sig=${sig}`;
+    const returnUrl = `${base}/donate/${org.slug}?pay=return`;
+    const redirectUrl = buildOngiPaymentUrl({
+      name,
+      phone: data.donorPhone || undefined,
+      amount: data.amount,
+      callbackUrl,
+      returnUrl,
+    });
+    return Response.json({ ok: true, status: "PENDING", redirectUrl });
+  }
+
+  return Response.json({ ok: true, status: "COMPLETED" });
 }

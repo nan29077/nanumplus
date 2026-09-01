@@ -36,7 +36,7 @@ export default async function AdminOrganizationDetailPage({ params }: { params: 
   const admin = org.admins[0]?.user;
 
   // 수수료 설정 로드
-  const CHANNELS = ["SMS", "EASY_TRANSFER", "RECURRING_TRANSFER"] as const;
+  const CHANNELS = ["SMS", "EASY_TRANSFER", "RECURRING_TRANSFER", "RECURRING_CARD"] as const;
   let fees: { channel: string; feePercent: number; isDefault: boolean }[] = [];
   try {
     const dbFees = await prisma.organizationFee.findMany({

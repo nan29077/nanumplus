@@ -448,6 +448,10 @@ model DonationPage {
   heroTitle        String?
   heroSubtitle     String?
 
+  // 로고(페이지 전용) / 외부 링크 버튼
+  logoUrl          String?           // 후원페이지 전용 로고 (없으면 기관 로고/기본 아바타)
+  links            String?  @db.Text // JSON: [{label,url,type}] 홈페이지·SNS 버튼
+
   // 소개 / 스토리
   introTitle       String?
   introBody        String?  @db.Text
@@ -465,6 +469,7 @@ model DonationPage {
   showStats        Boolean  @default(true)
   showCampaigns    Boolean  @default(true)
   showFaq          Boolean  @default(false)
+  showSmsFeed      Boolean  @default(true) // 하단 문자후원 내역 카드 피드
 
   isPublished      Boolean  @default(true)
   createdAt        DateTime @default(now())
