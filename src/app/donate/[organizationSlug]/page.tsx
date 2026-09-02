@@ -77,7 +77,7 @@ export default async function DonatePage({ params, searchParams }: { params: { o
     cfg.showSmsFeed
       ? prisma.donation.findMany({
           where: { organizationId: org.id, channel: "SMS", deletedAt: null },
-          orderBy: { donatedAt: "desc" }, take: 12,
+          orderBy: { donatedAt: "desc" }, take: 5,
           select: { id: true, smsBody: true, senderPhone: true, donatedAt: true, amount: true, status: true },
         }).catch(() => [])
       : Promise.resolve([] as never[]),
@@ -245,10 +245,15 @@ export default async function DonatePage({ params, searchParams }: { params: { o
         </section>
       )}
 
-      {/* 문자후원 내역 피드 */}
+      {/* 문자후원 내역 피드 (최근 5개 + 전체보기) */}
       {cfg.showSmsFeed && smsFeed.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-3 text-lg font-bold text-stone-900">문자후원 내역</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-stone-900">문자후원 내역</h2>
+            <Link href={`/donate/${org.slug}/messages`} className="inline-flex items-center gap-1 text-sm font-medium" style={{ color: theme }}>
+              전체 보기 <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
           <SmsDonationGrid rows={smsFeed.map((d) => ({
             id: d.id, smsBody: d.smsBody, senderPhone: d.senderPhone,
             donatedAt: d.donatedAt.toISOString(), amount: d.amount, status: d.status,
