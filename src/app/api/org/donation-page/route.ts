@@ -6,24 +6,29 @@ import { writeAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/validation";
 import { resolveDonationPage } from "@/lib/donation-page";
 
+const imageUrlSchema = z.string().max(2048).refine((value) => {
+  if (value.startsWith("/images/donation-banners/") || value.startsWith("/uploads/donation-pages/")) return true;
+  return z.string().url().safeParse(value).success;
+}, "이미지 URL 형식이 올바르지 않습니다.");
+
 const blockSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("text"), heading: z.string().max(120).optional(), body: z.string().max(4000) }),
-  z.object({ type: z.literal("image"), imageUrl: z.string().url(), caption: z.string().max(200).optional() }),
+  z.object({ type: z.literal("image"), imageUrl: imageUrlSchema, caption: z.string().max(200).optional() }),
   z.object({ type: z.literal("quote"), body: z.string().max(600), author: z.string().max(60).optional() }),
 ]);
 
 const linkSchema = z.object({
   label: z.string().max(30),
   url: z.string().url("링크 URL 형식이 올바르지 않습니다."),
-  type: z.enum(["home", "instagram", "youtube", "facebook", "blog", "link"]),
+  type: z.enum(["home", "instagram", "youtube", "facebook", "blog", "kakao", "x", "link"]),
 });
 
 const schema = z.object({
   themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "테마 색상 형식이 올바르지 않습니다.").optional(),
-  heroImageUrl: z.string().url("이미지 URL 형식이 올바르지 않습니다.").optional().or(z.literal("")),
+  heroImageUrl: imageUrlSchema.optional().or(z.literal("")),
   heroTitle: z.string().max(80).optional().or(z.literal("")),
   heroSubtitle: z.string().max(160).optional().or(z.literal("")),
-  logoUrl: z.string().url("로고 URL 형식이 올바르지 않습니다.").optional().or(z.literal("")),
+  logoUrl: imageUrlSchema.optional().or(z.literal("")),
   links: z.array(linkSchema).max(8).optional(),
   introTitle: z.string().max(120).optional().or(z.literal("")),
   introBody: z.string().max(4000).optional().or(z.literal("")),

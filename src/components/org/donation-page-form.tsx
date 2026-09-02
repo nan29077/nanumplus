@@ -4,14 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Save, Loader2, Check, Plus, Trash2, ArrowUp, ArrowDown, ExternalLink,
-  Type, Quote, Image as ImageIcon, Link2, Plus as PlusIcon,
+  Type, Quote, Image as ImageIcon, Link2, Plus as PlusIcon, CheckCircle2, Eye,
 } from "lucide-react";
 import {
   ALL_CHANNELS, CHANNEL_META, type DonationChannelKey,
   type DonationPageConfig, type StoryBlock,
-  LINK_TYPES, LINK_TYPE_LABELS, type LinkButton, type LinkButtonType,
+  LINK_TYPES, LINK_TYPE_LABELS, LINK_TYPE_BUTTON_LABELS, type LinkButton, type LinkButtonType,
+  DONATION_BANNER_PRESETS,
 } from "@/lib/donation-page";
 import { formatKRW } from "@/lib/utils";
+import { ImageUploadField } from "@/components/org/image-upload-field";
 
 const field = "mt-1.5 w-full rounded-xl border border-stone-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500";
 const labelCls = "text-sm font-medium text-stone-700";
@@ -27,6 +29,8 @@ export function DonationPageForm({
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
   const [amountInput, setAmountInput] = useState("");
+  const [savedModal, setSavedModal] = useState(false);
+  const [savedConfig, setSavedConfig] = useState<DonationPageConfig | null>(null);
 
   const set = <K extends keyof DonationPageConfig>(k: K, v: DonationPageConfig[K]) => {
     setC((p) => ({ ...p, [k]: v }));
@@ -75,11 +79,19 @@ export function DonationPageForm({
 
   const addLink = () => {
     if (c.links.length >= 8) return;
-    set("links", [...c.links, { label: "", url: "", type: "home" as LinkButtonType }]);
+    set("links", [...c.links, { label: LINK_TYPE_BUTTON_LABELS.home, url: "", type: "home" as LinkButtonType }]);
   };
   const updateLink = (i: number, patch: Partial<LinkButton>) =>
     set("links", c.links.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const removeLink = (i: number) => set("links", c.links.filter((_, idx) => idx !== i));
+  const changeLinkType = (i: number, type: LinkButtonType) => {
+    const current = c.links[i];
+    const knownDefaults = new Set(Object.values(LINK_TYPE_BUTTON_LABELS));
+    updateLink(i, {
+      type,
+      label: !current.label || knownDefaults.has(current.label) ? LINK_TYPE_BUTTON_LABELS[type] : current.label,
+    });
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +110,7 @@ export function DonationPageForm({
           links: c.links,
           introTitle: c.introTitle ?? "",
           introBody: c.introBody ?? "",
-          blocks: c.blocks,
+          blocks: c.blocks.filter((b) => b.type !== "image" || Boolean(b.imageUrl)),
           suggestedAmounts: c.suggestedAmounts,
           enabledChannels: c.enabledChannels,
           thankYouTitle: c.thankYouTitle ?? "",
@@ -110,18 +122,25 @@ export function DonationPageForm({
           isPublished: c.isPublished,
         }),
       });
+      const response = await res.json().catch(() => null);
       if (!res.ok) {
-        const b = await res.json().catch(() => null);
-        setError(b?.error ?? "저장 중 문제가 발생했습니다.");
+        setError(response?.error ?? "저장 중 문제가 발생했습니다.");
         return;
       }
-      setDone(true);
-      router.refresh();
+      setSavedConfig(response?.config ?? c);
+      setSavedModal(true);
     } catch {
       setError("네트워크 오류로 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setBusy(false);
     }
+  };
+
+  const confirmSaved = () => {
+    if (savedConfig) setC(savedConfig);
+    setSavedModal(false);
+    setDone(true);
+    router.refresh();
   };
 
   return (
@@ -161,16 +180,25 @@ export function DonationPageForm({
           <input value={c.themeColor} onChange={(e) => set("themeColor", e.target.value)}
             className="w-32 rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
         </div>
-        <div>
-          <label className={labelCls}>대표 이미지 URL (배너)</label>
-          <input value={c.heroImageUrl ?? ""} onChange={(e) => set("heroImageUrl", e.target.value || null)}
-            placeholder="https://..." className={field} />
+        <div className="rounded-2xl border border-brand-100 bg-brand-50/70 px-4 py-3">
+          <p className="flex items-center gap-2 text-sm font-semibold text-brand-800"><Eye className="h-4 w-4" /> 이미지가 표시되는 위치</p>
+          <p className="mt-1 text-xs leading-relaxed text-brand-700">대표 배너는 공개 후원페이지의 가장 위에 크게 표시되고, 로고는 상단 메뉴와 기관 소개 카드에 표시됩니다.</p>
         </div>
-        <div>
-          <label className={labelCls}>로고 이미지 URL (좌측 상단)</label>
-          <input value={c.logoUrl ?? ""} onChange={(e) => set("logoUrl", e.target.value || null)}
-            placeholder="비우면 기관 기본 로고가 표시됩니다" className={field} />
-        </div>
+        <ImageUploadField
+          label="대표 배너 이미지"
+          description="나눔플러스 기본 배너 5종 중 선택하거나, 이미지 URL 입력 또는 파일 첨부를 이용하세요. 권장 비율은 16:9입니다."
+          value={c.heroImageUrl}
+          onChange={(url) => set("heroImageUrl", url)}
+          kind="hero"
+          presets={DONATION_BANNER_PRESETS}
+        />
+        <ImageUploadField
+          label="기관 로고 이미지"
+          description="비워두면 기관 기본 로고 또는 기관별 프로필 이미지가 사용됩니다. 정사각형 이미지를 권장합니다."
+          value={c.logoUrl}
+          onChange={(url) => set("logoUrl", url)}
+          kind="logo"
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelCls}>대표 문구</label>
@@ -203,12 +231,12 @@ export function DonationPageForm({
           {c.links.map((l, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2">
               <Link2 className="h-4 w-4 shrink-0 text-stone-300" />
-              <select value={l.type} onChange={(e) => updateLink(i, { type: e.target.value as LinkButtonType })}
+              <select value={l.type} onChange={(e) => changeLinkType(i, e.target.value as LinkButtonType)}
                 className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500">
                 {LINK_TYPES.map((t) => <option key={t} value={t}>{LINK_TYPE_LABELS[t]}</option>)}
               </select>
               <input value={l.label} onChange={(e) => updateLink(i, { label: e.target.value })}
-                placeholder="버튼 이름" className="w-28 rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+                placeholder={LINK_TYPE_BUTTON_LABELS[l.type]} className="min-w-40 rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
               <input value={l.url} onChange={(e) => updateLink(i, { url: e.target.value })}
                 placeholder="https://..." className="min-w-[8rem] flex-1 rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
               <button type="button" onClick={() => removeLink(i)} className="rounded-lg p-2 text-rose-400 hover:bg-rose-50">
@@ -217,6 +245,7 @@ export function DonationPageForm({
             </div>
           ))}
         </div>
+        <p className="text-xs leading-relaxed text-stone-400">링크 종류에 맞는 아이콘과 기본 버튼명이 공개 후원페이지에 자동으로 표시됩니다. 버튼명은 기관에 맞게 직접 바꿀 수 있습니다.</p>
       </div>
 
       {/* 소개 */}
@@ -289,8 +318,8 @@ export function DonationPageForm({
               )}
               {b.type === "image" && (
                 <div className="space-y-2">
-                  <input value={b.imageUrl} onChange={(e) => updateBlock(i, { imageUrl: e.target.value })}
-                    placeholder="이미지 URL (https://...)" className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+                  <ImageUploadField label="스토리 이미지" description="URL 입력 또는 파일 첨부가 가능합니다."
+                    value={b.imageUrl || null} onChange={(url) => updateBlock(i, { imageUrl: url ?? "" })} kind="story" />
                   <input value={b.caption ?? ""} onChange={(e) => updateBlock(i, { caption: e.target.value })}
                     placeholder="설명 (선택)" className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
                 </div>
@@ -382,6 +411,22 @@ export function DonationPageForm({
           {busy ? "저장 중..." : "후원페이지 저장"}
         </button>
       </div>
+
+      {savedModal && (
+        <div className="fixed inset-0 z-[70] grid place-items-center bg-stone-950/45 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="saved-title">
+          <div className="w-full max-w-sm rounded-3xl border border-white/60 bg-white p-7 text-center shadow-2xl">
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-brand-50 text-brand-600">
+              <CheckCircle2 className="h-8 w-8" strokeWidth={1.75} />
+            </span>
+            <h2 id="saved-title" className="mt-4 text-lg font-bold text-stone-900">후원페이지 설정이 적용되었습니다</h2>
+            <p className="mt-2 text-sm leading-relaxed text-stone-500">대표 이미지, 로고, 문구와 표시 옵션이 저장되었습니다. 확인을 누르면 최신 설정으로 화면을 갱신합니다.</p>
+            <button type="button" onClick={confirmSaved} autoFocus
+              className="mt-6 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white hover:bg-brand-700">
+              확인
+            </button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

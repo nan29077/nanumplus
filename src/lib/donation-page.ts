@@ -30,21 +30,73 @@ export const CHANNEL_META: Record<
 export const DEFAULT_SUGGESTED_AMOUNTS = [10000, 30000, 50000, 100000];
 export const DEFAULT_THEME_COLOR = "#2f8f5b";
 
+export const DONATION_BANNER_PRESETS = [
+  {
+    id: "warm-care",
+    label: "따뜻한 돌봄",
+    style: "실사진",
+    url: "/images/donation-banners/warm-care-photo.webp",
+  },
+  {
+    id: "children-learning",
+    label: "아이들의 배움",
+    style: "실사진",
+    url: "/images/donation-banners/children-learning-photo.webp",
+  },
+  {
+    id: "community-meal",
+    label: "이웃의 한 끼",
+    style: "실사진",
+    url: "/images/donation-banners/community-meal-photo.webp",
+  },
+  {
+    id: "sharing-village",
+    label: "나눔 마을",
+    style: "3D 애니메이션",
+    url: "/images/donation-banners/sharing-village-animation.webp",
+  },
+  {
+    id: "community-garden",
+    label: "함께 키우는 변화",
+    style: "수채화 일러스트",
+    url: "/images/donation-banners/community-garden-illustration.webp",
+  },
+] as const;
+
+/** 기관마다 같은 배너가 몰리지 않도록 안정적인 기본 배너를 선택한다. */
+export function getDefaultDonationBanner(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return DONATION_BANNER_PRESETS[hash % DONATION_BANNER_PRESETS.length].url;
+}
+
 export type StoryBlock =
   | { type: "text"; heading?: string; body: string }
   | { type: "image"; imageUrl: string; caption?: string }
   | { type: "quote"; body: string; author?: string };
 
-export type LinkButtonType = "home" | "instagram" | "youtube" | "facebook" | "blog" | "link";
+export type LinkButtonType = "home" | "instagram" | "youtube" | "facebook" | "blog" | "kakao" | "x" | "link";
 export type LinkButton = { label: string; url: string; type: LinkButtonType };
-export const LINK_TYPES: LinkButtonType[] = ["home", "instagram", "youtube", "facebook", "blog", "link"];
+export const LINK_TYPES: LinkButtonType[] = ["home", "instagram", "youtube", "facebook", "blog", "kakao", "x", "link"];
 export const LINK_TYPE_LABELS: Record<LinkButtonType, string> = {
   home: "홈페이지",
   instagram: "인스타그램",
   youtube: "유튜브",
   facebook: "페이스북",
-  blog: "블로그",
+  blog: "네이버 블로그",
+  kakao: "카카오채널",
+  x: "X(트위터)",
   link: "기타 링크",
+};
+export const LINK_TYPE_BUTTON_LABELS: Record<LinkButtonType, string> = {
+  home: "홈페이지 바로가기",
+  instagram: "인스타그램 바로가기",
+  youtube: "유튜브 바로가기",
+  facebook: "페이스북 바로가기",
+  blog: "네이버 블로그 바로가기",
+  kakao: "카카오채널 바로가기",
+  x: "X 바로가기",
+  link: "링크 바로가기",
 };
 
 export type DonationPageConfig = {
@@ -145,7 +197,7 @@ function normalizeLinks(input: unknown): LinkButton[] {
     const type = (l as { type?: unknown }).type;
     if (typeof url !== "string" || !url) continue;
     out.push({
-      label: typeof label === "string" && label ? label : "바로가기",
+      label: typeof label === "string" && label ? label : LINK_TYPE_BUTTON_LABELS[(typeof type === "string" && types.has(type) ? type : "link") as LinkButtonType],
       url,
       type: (typeof type === "string" && types.has(type) ? type : "link") as LinkButtonType,
     });

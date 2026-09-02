@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 /** 공개 캠페인 목록 (진행 중 우선) */
 export async function GET() {
   const campaigns = await prisma.campaign.findMany({

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { DonationPageForm } from "@/components/org/donation-page-form";
-import { resolveDonationPage } from "@/lib/donation-page";
+import { getDefaultDonationBanner, resolveDonationPage } from "@/lib/donation-page";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +11,13 @@ export default async function OrgDonationPageSettings() {
   const user = await requireOrgAdmin();
   const org = await prisma.organization.findUnique({
     where: { id: user.organizationId },
-    select: { name: true, slug: true },
+    select: { id: true, name: true, slug: true },
   });
   const row = await prisma.donationPage.findUnique({
     where: { organizationId: user.organizationId },
   });
   const config = resolveDonationPage(row);
+  if (!config.heroImageUrl && org?.id) config.heroImageUrl = getDefaultDonationBanner(org.id);
 
   return (
     <OrgLayout userName={user.name} orgName={org?.name ?? "기관"}>
