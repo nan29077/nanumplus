@@ -14,6 +14,7 @@ import { getOrganizationAvatar } from "@/lib/organization-avatar";
 import { getDefaultDonationBanner, LINK_TYPE_BUTTON_LABELS, resolveDonationPage, type LinkButtonType } from "@/lib/donation-page";
 import { getDonorSession } from "@/lib/donor-auth";
 import { DonateShell } from "@/components/donation/donate-shell";
+import { AutoFitText } from "@/components/donation/auto-fit-text";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,8 @@ export default async function DonatePage({ params, searchParams }: { params: { o
   const heroImageUrl = cfg.heroImageUrl || getDefaultDonationBanner(org.id);
   const donor = await getDonorSession();
   const theme = cfg.themeColor;
+  const heroTitle = cfg.heroTitle || `${org.name}과 함께 나눔을 시작해요`;
+  const heroSubtitle = cfg.heroSubtitle || "작은 마음이 모여 이웃의 오늘을 바꾸고, 더 따뜻한 내일을 만듭니다.";
 
   if (!cfg.isPublished) {
     return (
@@ -95,12 +98,24 @@ export default async function DonatePage({ params, searchParams }: { params: { o
         <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-stone-950/25 to-transparent" />
         <div className="relative z-10 flex min-h-[300px] flex-col justify-end px-6 pb-16 pt-16 text-white sm:min-h-[360px] sm:px-10 sm:pb-20">
           <span className="mb-4 w-fit rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-xs font-semibold backdrop-blur">함께 만드는 따뜻한 변화</span>
-          <h1 className="max-w-lg text-3xl font-bold leading-tight drop-shadow-sm sm:text-4xl">
-            {cfg.heroTitle || `${org.name}과 함께 나눔을 시작해요`}
-          </h1>
-          <p className="mt-3 max-w-md text-sm leading-relaxed text-white/90 drop-shadow-sm sm:text-base">
-            {cfg.heroSubtitle || "작은 마음이 모여 이웃의 오늘을 바꾸고, 더 따뜻한 내일을 만듭니다."}
-          </p>
+          <AutoFitText
+            as="h1"
+            mobileMaxSize={30}
+            desktopMaxSize={40}
+            minSize={3}
+            className="text-[30px] font-bold leading-tight drop-shadow-sm sm:text-[40px]"
+          >
+            {heroTitle}
+          </AutoFitText>
+          <AutoFitText
+            as="p"
+            mobileMaxSize={14}
+            desktopMaxSize={16}
+            minSize={2}
+            className="mt-3 text-sm leading-relaxed text-white/90 drop-shadow-sm sm:text-base"
+          >
+            {heroSubtitle}
+          </AutoFitText>
         </div>
       </section>
 
