@@ -33,7 +33,6 @@ export default async function AdminEmmaSettingsPage() {
   const provider = process.env.INFOBANK_PROVIDER ?? "mock";
   const emmaId = process.env.EMMA_ID ?? "";
   const emmaCronSecret = !!(process.env.EMMA_CRON_SECRET);
-  const mtSender = process.env.INFOBANK_MT_SENDER_NUMBER ?? "";
   const emmaDbUrl = process.env.EMMA_DB_URL ?? "";
   const isLive = provider === "live" && !!emmaId;
 
@@ -76,7 +75,7 @@ export default async function AdminEmmaSettingsPage() {
   // 감사 문자 전역 설정 / 기관 켜짐 현황
   const [mtGlobal, mtOrgs] = await Promise.all([getMtGlobalConfig(), countMtEnabledOrgs()]);
 
-  // MT 발송 큐(em_smt_tran) 진단 — EMMA가 실제로 집어가는 테이블은 여기다.
+  // 감사 문자 발송 대기 목록(em_smt_tran) 진단 — EMMA가 실제로 집어가는 테이블은 여기다.
   // (기존 화면은 em_mt_log_YYYYMM 을 보고 있어 2026-08-26 장애를 전혀 잡아내지 못했다)
   let mtQueueExists = false;
   let mtQueueWaiting = 0;
@@ -290,48 +289,48 @@ export default async function AdminEmmaSettingsPage() {
         )}
       </div>
 
-      {/* MT 발송 큐 상태 — 실제 EMMA가 폴링하는 테이블 */}
+      {/* 감사 문자 발송 대기 현황 — 실제 EMMA가 폴링하는 테이블(em_smt_tran) */}
       <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-card">
         <div className="flex items-center gap-2 mb-4">
           <Send className="h-4 w-4 text-brand-500" strokeWidth={1.75} />
-          <h2 className="text-sm font-semibold text-stone-900">MT 발송 큐 상태</h2>
+          <h2 className="text-sm font-semibold text-stone-900">감사 문자 발송 대기 현황</h2>
           <span className="ml-auto text-xs text-stone-400">em_smt_tran</span>
         </div>
         {mtQueueError ? (
           <div className="rounded-xl bg-rose-50 border border-rose-100 px-4 py-3 text-sm text-rose-700">
-            <p className="font-semibold mb-1">큐 조회 오류</p>
+            <p className="font-semibold mb-1">대기 목록을 읽지 못했습니다</p>
             <p className="text-xs font-mono">{mtQueueError}</p>
           </div>
         ) : !mtQueueExists ? (
           <div className="rounded-xl bg-rose-50 border border-rose-100 px-4 py-3 text-sm text-rose-700">
-            <p className="font-semibold mb-1">발송 큐 테이블이 없습니다</p>
+            <p className="font-semibold mb-1">발송 대기 목록이 준비되지 않았습니다</p>
             <p className="text-xs">
-              EMMA가 감사 문자를 집어갈 <code className="rounded bg-rose-100 px-1">em_smt_tran</code> 테이블이
-              존재하지 않습니다. 이 상태에서는 감사 문자가 한 통도 발송되지 않습니다.
+              보낼 문자를 담아두는 자리가 없어, 이 상태에서는 감사 문자가 한 통도 나가지 않습니다.
+              (문자 발송 프로그램 EMMA가 읽어가는 <code className="rounded bg-rose-100 px-1">em_smt_tran</code> 목록이 없는 상태)
             </p>
             <p className="mt-2 text-xs text-rose-500">
-              조치: 고아 시퀀스(sq_em_smt_tran_01) 잔존 여부를 확인하고, 필요 시 제거 후 EMMA를 재기동하세요.
-              (db:push 실행 후 db:emma 미실행이 원인인 경우가 많습니다)
+              개발자 확인 필요: 남아 있는 시퀀스(sq_em_smt_tran_01)를 제거한 뒤 EMMA를 재기동해야 합니다.
+              운영에서 db:push 를 실행한 뒤 db:emma 를 다시 돌리지 않은 경우가 대부분입니다.
             </p>
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-stone-50 px-4 py-3">
-              <p className="text-xs text-stone-400">발송 대기 (msg_status=1)</p>
+              <p className="text-xs text-stone-400">아직 나가지 않은 문자</p>
               <p className="mt-1 text-xl font-bold text-stone-900">
                 {mtQueueWaiting.toLocaleString("ko-KR")}<span className="ml-1 text-sm font-normal text-stone-400">건</span>
               </p>
             </div>
             <div className="rounded-xl bg-stone-50 px-4 py-3">
-              <p className="text-xs text-stone-400">큐 전체</p>
+              <p className="text-xs text-stone-400">대기 목록에 남은 문자</p>
               <p className="mt-1 text-xl font-bold text-stone-900">
                 {mtQueueTotal.toLocaleString("ko-KR")}<span className="ml-1 text-sm font-normal text-stone-400">건</span>
               </p>
             </div>
             {mtQueueWaiting > 0 && (
               <div className="sm:col-span-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-3 text-xs text-amber-700">
-                대기 건이 계속 줄지 않으면 EMMA의 MT 프로세스(mtsender·smtcollector)가 꺼져 있거나
-                emma_id 가 맞지 않는 것입니다. EMMA 로그를 확인하세요.
+                이 숫자가 계속 줄지 않으면 문자가 실제로 나가지 못하고 쌓이는 중입니다.
+                문자 발송 프로그램(EMMA)이 꺼져 있거나 설정이 맞지 않는 경우이니 개발자 확인이 필요합니다.
               </div>
             )}
           </div>
