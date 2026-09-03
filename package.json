@@ -12,7 +12,8 @@
     "db:emma": "bash emma-sql/install.sh",
     "db:seed": "tsx prisma/seed.ts",
     "db:init-admin": "tsx prisma/init-admin.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:sync-prod-mt": "prisma db execute --file prisma/sync-prod-20260903-mt-switch.sql --schema prisma/schema.prisma"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

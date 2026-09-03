@@ -15,6 +15,8 @@ import { QRCodeCard } from "@/components/donation/qr-code-card";
 import { OrgFeeClient } from "@/components/admin/org-fee-client";
 import { OrgEditDelete } from "@/components/admin/org-edit-delete";
 import { OrgResetPassword } from "@/components/admin/org-reset-password";
+import { OrgMtSwitch } from "@/components/admin/org-mt-switch";
+import { getMtGlobalConfig } from "@/lib/messaging";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +54,9 @@ export default async function AdminOrganizationDetailPage({ params }: { params: 
   } catch {
     fees = CHANNELS.map((ch) => ({ channel: ch, feePercent: 5.0, isDefault: true }));
   }
+
+  // 감사 문자 전역 설정 — 기관 스위치 화면에서 "지금 실제로 나가는지"를 함께 보여주기 위함
+  const mtGlobal = await getMtGlobalConfig();
 
   // QR 코드: 마이그레이션으로 등록된 기관은 미발급 상태이므로 조회 시점에 즉시 발급한다.
   const qrImageDataUrl = await ensureOrgQrCode({
@@ -129,6 +134,16 @@ export default async function AdminOrganizationDetailPage({ params }: { params: 
           targetUrl={donatePageUrl(org.slug)}
           orgName={org.name}
           regenerateEndpoint={`/api/admin/organizations/${org.id}/qr-code`}
+        />
+      </div>
+
+      <div className="mt-4">
+        <OrgMtSwitch
+          orgId={org.id}
+          orgName={org.name}
+          initialEnabled={org.smsMtEnabled}
+          initialSenderNumber={org.mtSenderNumber}
+          globalEnabled={mtGlobal.enabled}
         />
       </div>
 

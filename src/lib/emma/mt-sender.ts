@@ -13,22 +13,54 @@
  *   broadcast_yn    CHAR(1)         -- 'N'
  *   msg_status      CHAR(1)         -- '1' = 발송 대기 (EMMA가 픽업)
  *   recipient_num   VARCHAR(25)     -- 수신자 번호
- *   emma_id         CHAR(2)
+ *   emma_id         CHAR(2)         -- 반드시 공백. EMMA가 선점하며 자기 ID를 찍는다
  *
  * 발송 결과는 EMMA가 msg_status/mt_report_code_ib를 갱신하고
  * 월별 em_smt_log_YYYYMM으로 이관한다.
  */
 
 import { getEmmaClient } from "./client";
+import { resolveMtGate } from "@/lib/messaging";
 import type { EmmaMtSendRequest, EmmaMtSendResult } from "./types";
 
-/** EMMA 발송 큐(em_smt_tran)에 MT 등록 — EMMA 에이전트가 픽업해 발송 */
+/**
+ * EMMA 발송 큐(em_smt_tran)에 MT 등록 — EMMA 에이전트가 픽업해 발송.
+ *
+ * ★ 최종 안전장치(2026-09-03):
+ *   호출부(mo-processor 등)에서 이미 게이트를 통과했더라도, 큐에 넣기 직전에
+ *   한 번 더 확인한다. 이 함수를 거치지 않고 em_smt_tran 에 들어가는 경로는 없으므로
+ *   여기가 마지막 방어선이다. 기관 ID가 없으면 fail-closed 로 차단한다.
+ */
 export async function sendEmmaMt(
   req: EmmaMtSendRequest
 ): Promise<EmmaMtSendResult> {
-  // EMMA_ID = "nanum" -> CHAR(2) 필드에는 앞 2자리 "na"만 기록
-  const emmaIdFull = process.env.EMMA_ID ?? "  ";
-  const emmaId = emmaIdFull.substring(0, 2).padEnd(2, " ");
+  // ── 발송 게이트 (전역 마스터 AND 기관 스위치) ──
+  if (!req.organizationId) {
+    console.warn(
+      "[emma-mt] 기관 ID 없는 발송 요청 — 차단합니다 (fail-closed)",
+      req.moKey ? `moKey=${req.moKey}` : ""
+    );
+    return { mtKey: "", status: "BLOCKED", message: "기관 ID 미지정" };
+  }
+  const gate = await resolveMtGate(req.organizationId);
+  if (!gate.allowed) {
+    console.log(`[emma-mt] 발송 차단 (org=${req.organizationId}): ${gate.reason}`);
+    return { mtKey: "", status: "BLOCKED", message: gate.reason };
+  }
+
+  /**
+   * emma_id 는 반드시 공백(' ')으로 넣는다.
+   *
+   * 근거 — EMMA 3.7 저장 프로시저 sp_em_smt_tran_select (emma-sql/emma_sp_smt.sql):
+   *   ... AND emma_id = '' ''       -- 공백인 행만 조회해서
+   *   UPDATE em_smt_tran SET emma_id = p_emma_id WHERE mt_pr = ...  -- 자기 ID를 찍는다
+   * 즉 emma_id 는 "우리가 채우는 값"이 아니라 "EMMA가 선점 표시로 찍는 값"이다.
+   * 공백이 아닌 값을 넣으면 EMMA가 영원히 집어가지 않는다.
+   *
+   * 과거 구현은 .env 의 EMMA_ID("nanum")를 앞 2자리로 잘라 'na' 를 넣었는데,
+   * EMMA_ID 는 인포뱅크 인증 ID(emma.cf 의 auth.id)이지 이 컬럼 값이 아니다.
+   */
+  const emmaId = "  ";
 
   const client = getEmmaClient();
 
@@ -41,7 +73,7 @@ export async function sendEmmaMt(
         nextval('sq_em_smt_tran_01'), NOW(), $1, $2, '0', 'N', '1', $3, $4
       ) RETURNING mt_pr`,
       req.content,
-      req.senderPhone,
+      gate.senderNumber,
       req.recipientPhone,
       emmaId
     );

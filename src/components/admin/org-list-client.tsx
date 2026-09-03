@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Search, Building2, ChevronRight, Percent, X, Check, Loader2 } from "lucide-react";
+import { Search, Building2, ChevronRight, Percent, X, Check, Loader2, MessageSquare } from "lucide-react";
 import { formatKRW } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -18,6 +18,8 @@ export type OrgListItem = {
   phone: string | null;
   loginId: string | null;
   isActive: boolean;
+  /** 감사 문자(MT) 기관별 스위치 */
+  smsMtEnabled: boolean;
   donorCount: number;
   campaignCount: number;
   total: number;
@@ -35,6 +37,9 @@ const onlyDigits = (v: string) => v.replace(/[^0-9]/g, "");
 export function OrgListClient({ orgs }: { orgs: OrgListItem[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  /** 감사 문자가 켜진 기관만 보기 — 173개 중 몇 곳이 켜져 있는지 즉시 확인하기 위함 */
+  const [mtOnly, setMtOnly] = useState(false);
+  const mtEnabledCount = useMemo(() => orgs.filter((o) => o.smsMtEnabled).length, [orgs]);
 
   // 수수료 일괄 입력
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -56,10 +61,11 @@ export function OrgListClient({ orgs }: { orgs: OrgListItem[] }) {
   const [bulkDone, setBulkDone] = useState("");
 
   const filtered = useMemo(() => {
+    const base = mtOnly ? orgs.filter((o) => o.smsMtEnabled) : orgs;
     const q = query.trim().toLowerCase();
-    if (!q) return orgs;
+    if (!q) return base;
     const qDigits = onlyDigits(q);
-    return orgs.filter((o) => {
+    return base.filter((o) => {
       const name = o.name.toLowerCase();
       const loginId = (o.loginId ?? "").toLowerCase();
       const phone = o.phone ?? "";
@@ -70,7 +76,7 @@ export function OrgListClient({ orgs }: { orgs: OrgListItem[] }) {
         (qDigits.length > 0 && onlyDigits(phone).includes(qDigits))
       );
     });
-  }, [orgs, query]);
+  }, [orgs, query, mtOnly]);
 
   const toggleOne = (id: string) => {
     setBulkDone("");
@@ -165,6 +171,23 @@ export function OrgListClient({ orgs }: { orgs: OrgListItem[] }) {
             </button>
           )}
         </div>
+        <button
+          type="button"
+          onClick={() => setMtOnly((v) => !v)}
+          aria-pressed={mtOnly}
+          title="감사 문자 발송이 켜진 기관만 보기"
+          className={
+            mtOnly
+              ? "flex items-center gap-1.5 rounded-xl border border-brand-500 bg-brand-50 px-3 py-2.5 text-sm font-medium text-brand-700"
+              : "flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50"
+          }
+        >
+          <MessageSquare className="h-4 w-4" strokeWidth={1.75} />
+          감사문자 켜짐
+          <span className={mtOnly ? "text-brand-600" : "text-stone-400"}>
+            {mtEnabledCount}/{orgs.length}
+          </span>
+        </button>
         <button
           type="button"
           onClick={() => { setBulkOpen((v) => !v); setBulkError(""); setBulkDone(""); }}
@@ -302,6 +325,7 @@ export function OrgListClient({ orgs }: { orgs: OrgListItem[] }) {
                     <Badge tone="gray">문자번호 미부여</Badge>
                   )}
                   {o.isActive ? <Badge tone="green">운영 중</Badge> : <Badge tone="red">비활성</Badge>}
+                  {o.smsMtEnabled && <Badge tone="violet">감사문자</Badge>}
                 </div>
 
                 <div className="mt-4 grid grid-cols-3 gap-2 border-t border-stone-100 pt-3 text-center">

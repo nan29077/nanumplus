@@ -31,6 +31,8 @@ export interface SmsMtRequest {
   message: string;
   /** 추적용 (옵션) */
   providerTransactionId?: string;
+  /** 발송 게이트 판정용 기관 ID — 미지정 시 안전을 위해 발송이 차단된다 */
+  organizationId?: string;
 }
 
 export interface SmsMtResult {

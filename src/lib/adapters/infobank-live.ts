@@ -76,7 +76,17 @@ export class InfobankLiveAdapter implements InfobankSmsDonationAdapter {
       senderPhone: req.senderNumber,
       content: req.message,
       moKey: req.providerTransactionId,
+      organizationId: req.organizationId,
     });
+
+    if (result.status === "BLOCKED") {
+      // 오류가 아니라 정책에 의한 정상 차단 — 호출부가 에러로 처리하지 않도록 구분한다.
+      return {
+        ok: false,
+        errorCode: "MT_BLOCKED",
+        message: result.message ?? "발송 스위치가 꺼져 있어 발송하지 않았습니다.",
+      };
+    }
 
     if (result.status === "ERROR") {
       return {

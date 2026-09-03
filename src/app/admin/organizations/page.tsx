@@ -25,6 +25,7 @@ export default async function AdminOrganizationsPage() {
         smsFullNumber: true,
         phone: true,
         isActive: true,
+        smsMtEnabled: true,
         // 검색용 로그인 ID(기관 관리자 이메일)
         admins: { select: { user: { select: { email: true } } }, take: 1 },
         _count: { select: { donors: { where: { deletedAt: null } }, campaigns: { where: { deletedAt: null } } } },
@@ -52,6 +53,7 @@ export default async function AdminOrganizationsPage() {
     phone: o.phone,
     loginId: o.admins[0]?.user.email ?? null,
     isActive: o.isActive,
+    smsMtEnabled: o.smsMtEnabled,
     donorCount: o._count.donors,
     campaignCount: o._count.campaigns,
     total: totalByOrg.get(o.id) ?? 0,

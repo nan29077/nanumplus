@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { apiAuth } from "@/lib/rbac";
 import { sanitizeText } from "@/lib/sanitize";
 import { writeAuditLog } from "@/lib/audit";
+import { validateSenderNumber } from "@/lib/messaging";
 import { getClientIp } from "@/lib/validation";
 
 const updateSchema = z.object({
@@ -12,6 +13,15 @@ const updateSchema = z.object({
   phone: z.string().max(30).optional().nullable(),
   email: z.string().email().optional().or(z.literal("")).nullable(),
   isActive: z.boolean().optional(),
+  /** 감사 문자(MT) 기관별 발송 스위치 */
+  smsMtEnabled: z.boolean().optional(),
+  /** 기관 전용 MT 발신번호 (빈 문자열이면 전역 기본값 사용) */
+  mtSenderNumber: z
+    .string()
+    .max(20)
+    .regex(/^[0-9-]*$/, "발신번호는 숫자와 하이픈만 입력할 수 있습니다.")
+    .optional()
+    .nullable(),
 });
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -44,6 +54,32 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const org = await prisma.organization.findFirst({ where: { id: params.id, deletedAt: null } });
   if (!org) return Response.json({ error: "기관을 찾을 수 없습니다." }, { status: 404 });
 
+  // 발신번호는 오타 시 발송이 통째로 실패하므로 저장 전에 형식을 확인한다.
+  // (실제 발송 가능 여부는 인포뱅크 발신번호 사전등록 여부가 결정한다)
+  let normalizedSender: string | null | undefined;
+  if (d.mtSenderNumber !== undefined) {
+    const raw = (d.mtSenderNumber ?? "").trim();
+    if (raw === "") {
+      normalizedSender = null;
+    } else {
+      const check = validateSenderNumber(raw);
+      if (!check.ok) return Response.json({ error: check.reason }, { status: 400 });
+      normalizedSender = check.normalized;
+    }
+  }
+
+  // 발신번호 없이 스위치를 켤 수 없다 — 켜도 발송되지 않아 혼란만 준다.
+  if (d.smsMtEnabled === true) {
+    const effective =
+      normalizedSender !== undefined ? normalizedSender : org.mtSenderNumber;
+    if (!effective) {
+      return Response.json(
+        { error: "발신번호를 먼저 등록해야 감사 문자를 켤 수 있습니다." },
+        { status: 400 }
+      );
+    }
+  }
+
   const updated = await prisma.organization.update({
     where: { id: params.id },
     data: {
@@ -53,8 +89,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       ...(d.phone !== undefined ? { phone: d.phone || null } : {}),
       ...(d.email !== undefined ? { email: d.email || null } : {}),
       ...(d.isActive !== undefined ? { isActive: d.isActive } : {}),
+      ...(d.smsMtEnabled !== undefined ? { smsMtEnabled: d.smsMtEnabled } : {}),
+      ...(normalizedSender !== undefined ? { mtSenderNumber: normalizedSender } : {}),
     },
   });
+
+  // 발송 스위치 변경은 별도 감사 로그로 남긴다 — "언제 누가 켰나"를 추적해야 하는 항목이다.
+  if (d.smsMtEnabled !== undefined && d.smsMtEnabled !== org.smsMtEnabled) {
+    await writeAuditLog({
+      userId: auth.user.id,
+      action: d.smsMtEnabled ? "ORGANIZATION_MT_ENABLE" : "ORGANIZATION_MT_DISABLE",
+      entityType: "Organization",
+      entityId: org.id,
+      detail: { name: org.name, before: org.smsMtEnabled, after: d.smsMtEnabled },
+      ipAddress: getClientIp(req.headers),
+    });
+  }
 
   await writeAuditLog({
     userId: auth.user.id,

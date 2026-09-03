@@ -4,6 +4,7 @@ import { getInfobankAdapter } from "@/lib/adapters";
 import { SMS_DONATION_AMOUNT } from "@/lib/validation";
 import { syncCampaignAmountOnStatusChange } from "@/services/campaign-amount";
 import { writeAuditLog } from "@/lib/audit";
+import { resolveMtGate, buildThankYouMessage } from "@/lib/messaging";
 
 /**
  * 인포뱅크 문자후원 MO 결과 웹훅.
@@ -46,7 +47,8 @@ export async function POST(req: Request) {
   });
 
   // MT 발신 번호 (env가 비어있으면 MT 발송 생략)
-  const mtSenderNumber = process.env.INFOBANK_MT_SENDER_NUMBER ?? "";
+  // 발신번호는 발송 게이트(resolveMtGate)가 기관·전역 설정을 보고 결정한다.
+  // env INFOBANK_MT_SENDER_NUMBER 는 전역 기본값의 최후 폴백으로만 쓰인다.
 
   try {
     const txId = payload.providerTransactionId as string | undefined;
@@ -119,12 +121,19 @@ export async function POST(req: Request) {
         }
 
         // MT 발송 — 완료된 경우에만
-        if (next === "COMPLETED" && senderPhone && mtSenderNumber) {
+        // 발송 게이트: 전역 마스터 AND 기관 스위치를 통과한 경우에만 감사문자를 보낸다.
+        const webhookGate =
+          next === "COMPLETED" && senderPhone && donation.organizationId
+            ? await resolveMtGate(donation.organizationId)
+            : { allowed: false as const, reason: "대상 아님" };
+
+        if (webhookGate.allowed) {
           const orgName = donation.organization?.name ?? "기관";
           const mtResult = await adapter.sendMt({
-            recipientPhone: senderPhone,
-            senderNumber: mtSenderNumber,
-            message: `[나눔플러스] ${orgName}에 ${SMS_DONATION_AMOUNT.toLocaleString("ko-KR")}원을 후원해 주셔서 감사합니다. 따뜻한 마음이 큰 힘이 됩니다.`,
+            organizationId: donation.organizationId ?? undefined,
+            recipientPhone: senderPhone!,
+            senderNumber: webhookGate.senderNumber,
+            message: buildThankYouMessage(orgName, SMS_DONATION_AMOUNT),
             providerTransactionId: txId,
           });
           if (!mtResult.ok) {
@@ -180,11 +189,15 @@ export async function POST(req: Request) {
             });
 
             // MT 발송
-            if (senderPhone && mtSenderNumber) {
+            const newGate = senderPhone
+              ? await resolveMtGate(org.id)
+              : { allowed: false as const, reason: "발신 정보 없음" };
+            if (newGate.allowed) {
               const mtResult = await adapter.sendMt({
-                recipientPhone: senderPhone,
-                senderNumber: mtSenderNumber,
-                message: `[나눔플러스] ${org.name}에 ${SMS_DONATION_AMOUNT.toLocaleString("ko-KR")}원을 후원해 주셔서 감사합니다. 따뜻한 마음이 큰 힘이 됩니다.`,
+                organizationId: org.id,
+                recipientPhone: senderPhone!,
+                senderNumber: newGate.senderNumber,
+                message: buildThankYouMessage(org.name, SMS_DONATION_AMOUNT),
                 providerTransactionId: txId,
               });
               if (!mtResult.ok) {

@@ -86,7 +86,8 @@ export async function GET() {
       };
     }
 
-    // MT 테이블 존재 여부
+    // em_mt_log_YYYYMM 은 과거 구현이 만들던 자체 로그 테이블로, EMMA는 읽지 않는다.
+    // 참고용으로만 존재 여부를 남긴다. 실제 발송 큐 진단은 아래 mtQueue 를 볼 것.
     try {
       const mtExists = await client.$queryRawUnsafe<[{ exists: boolean }]>(
         `SELECT EXISTS (
@@ -97,13 +98,63 @@ export async function GET() {
       );
       (results.tables as any)[s] = {
         ...(results.tables as any)[s],
-        mtTable,
-        mtExists: mtExists[0].exists,
+        legacyMtLogTable: mtTable,
+        legacyMtLogExists: mtExists[0].exists,
+        note: "em_mt_log_* 는 EMMA가 읽지 않는 레거시 테이블입니다. 발송 큐는 em_smt_tran 입니다.",
       };
     } catch {
-      // MT 테이블 체크 실패 무시
+      // 레거시 테이블 체크 실패는 무시
     }
   }
+
+  /**
+   * MT 발송 큐 진단 — EMMA가 실제로 폴링하는 테이블은 em_smt_tran 이다.
+   *
+   * 2026-08-26 장애: db:push 가 em_* 테이블을 지우면서 독립 시퀀스
+   * sq_em_smt_tran_01 만 남았고, EMMA의 sp_em_smt_create() 가 CREATE SEQUENCE
+   * 단계에서 실패해 테이블이 영구히 재생성되지 않았다. 그런데 이 진단 API는
+   * em_mt_log_* 만 보고 있어 장애를 전혀 드러내지 못했다. 그래서 아래를 추가한다.
+   */
+  const mtQueue: Record<string, unknown> = { table: "em_smt_tran" };
+  try {
+    const exists = await client.$queryRawUnsafe<[{ exists: boolean }]>(
+      `SELECT to_regclass('public.em_smt_tran') IS NOT NULL AS exists`
+    );
+    mtQueue.exists = exists[0].exists;
+
+    if (exists[0].exists) {
+      const rows = await client.$queryRawUnsafe<
+        { msg_status: string; cnt: bigint; oldest: Date | null; newest: Date | null }[]
+      >(
+        `SELECT msg_status, count(*) AS cnt,
+                min(date_client_req) AS oldest, max(date_client_req) AS newest
+         FROM em_smt_tran GROUP BY msg_status ORDER BY 1`
+      );
+      mtQueue.byStatus = rows.map((r) => ({
+        msg_status: r.msg_status,
+        count: Number(r.cnt),
+        oldest: r.oldest,
+        newest: r.newest,
+      }));
+      mtQueue.waiting = rows
+        .filter((r) => r.msg_status === "1")
+        .reduce((n, r) => n + Number(r.cnt), 0);
+    } else {
+      // 테이블이 없다면 고아 시퀀스가 원인일 수 있으므로 함께 확인해 준다.
+      const seq = await client.$queryRawUnsafe<{ sequencename: string }[]>(
+        `SELECT sequencename FROM pg_sequences
+         WHERE schemaname = 'public' AND sequencename LIKE 'sq/_em%' ESCAPE '/'`
+      );
+      mtQueue.orphanSequences = seq.map((r) => r.sequencename);
+      mtQueue.hint =
+        seq.length > 0
+          ? "테이블은 없는데 시퀀스가 남아 있습니다. EMMA의 테이블 생성 프로시저가 CREATE SEQUENCE 에서 실패합니다. 시퀀스를 제거한 뒤 EMMA를 재기동하세요."
+          : "발송 큐 테이블이 없습니다. npm run db:emma 로 EMMA 테이블을 설치하세요.";
+    }
+  } catch (err) {
+    mtQueue.error = err instanceof Error ? err.message : String(err);
+  }
+  (results as any).mtQueue = mtQueue;
 
   // PostgreSQL 내 모든 데이터베이스 목록 (EMMA DB 위치 파악용)
   try {

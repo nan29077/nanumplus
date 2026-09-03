@@ -17,6 +17,7 @@
 import { prisma } from "@/lib/prisma";
 import { SMS_DONATION_AMOUNT } from "@/lib/validation";
 import { findOrCreateDonor, ANON_SMS_DONOR_NAME } from "@/lib/donor";
+import { resolveMtGate, buildThankYouMessage } from "@/lib/messaging";
 import { getEmmaClient, getEmmaSuffix, getPrevEmmaSuffix } from "./client";
 import { sendEmmaMt } from "./mt-sender";
 import {
@@ -169,29 +170,39 @@ async function findOrCreateMoDonor(
   });
 }
 
-/** MT 감사 문자 발송 */
+/**
+ * MT 감사 문자 발송.
+ *
+ * 큐에 넣기 전에 발송 게이트(전역 마스터 AND 기관 스위치)를 확인한다.
+ * em_smt_tran 에 들어간 뒤에는 EMMA가 집어가므로 되돌릴 수 없다 —
+ * 차단은 반드시 이 지점에서 이루어져야 한다.
+ */
 async function sendThankYouMt(
-  orgName: string,
+  org: { id: string; name: string },
   recipientPhone: string,
   moKey: string
 ): Promise<void> {
-  const senderNumber = process.env.INFOBANK_MT_SENDER_NUMBER ?? "";
-  if (!senderNumber) {
-    console.log("[emma-mo] MT 발신 번호 미설정 → MT 발송 생략");
+  const gate = await resolveMtGate(org.id);
+  if (!gate.allowed) {
+    console.log(`[emma-mo] 감사문자 미발송 (org=${org.name}): ${gate.reason}`);
     return;
   }
 
-  const message = `[나눔플러스] ${orgName}에 ${SMS_DONATION_AMOUNT.toLocaleString("ko-KR")}원을 후원해 주셔서 감사합니다. 따뜻한 마음이 큰 힘이 됩니다.`;
+  // SMS 90바이트(EUC-KR) 한도를 넘지 않도록 조립한다 — 기존 문구는 대부분의 기관에서 초과했다.
+  const message = buildThankYouMessage(org.name, SMS_DONATION_AMOUNT);
 
   const result = await sendEmmaMt({
     recipientPhone,
-    senderPhone: senderNumber,
+    senderPhone: gate.senderNumber,
     content: message,
     moKey,
+    organizationId: org.id,
   });
 
   if (result.status === "ERROR") {
     console.error(`[emma-mo] MT 발송 실패 (moKey=${moKey}):`, result.message);
+  } else if (result.status === "BLOCKED") {
+    console.log(`[emma-mo] MT 차단 (moKey=${moKey}): ${result.message}`);
   }
 }
 
@@ -341,8 +352,8 @@ export async function processEmmaMo(): Promise<EmmaMoProcessResult> {
         // EMMA MO 완료 처리 ('9' = 나눔플러스 처리완료, EMMA '0'=신규와 충돌 방지)
         await updateMoStatus(suffix, mo_key, "9");
 
-        // MT 감사 문자 발송
-        await sendThankYouMt(org.name, mo_originator, mo_key);
+        // MT 감사 문자 발송 (게이트 통과 시에만 실제 발송)
+        await sendThankYouMt(org, mo_originator, mo_key);
 
         result.processed++;
         result.details.push({ moKey: mo_key, status: "created" });

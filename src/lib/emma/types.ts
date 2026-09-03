@@ -37,12 +37,19 @@ export interface EmmaMtSendRequest {
   content: string;
   /** 연결 MO 키 (옵션) */
   moKey?: string;
+  /**
+   * 발송 게이트 판정용 기관 ID.
+   * 미지정 시 fail-closed 로 차단된다 — 어느 기관 앞으로 나가는 문자인지
+   * 모르는 상태에서는 보내지 않는다.
+   */
+  organizationId?: string;
 }
 
 /** MT 발신 결과 */
 export interface EmmaMtSendResult {
   mtKey: string;
-  status: "QUEUED" | "ERROR";
+  /** BLOCKED = 게이트(전역 마스터·기관 스위치)에 막힘. 오류가 아니라 정상 차단이다. */
+  status: "QUEUED" | "ERROR" | "BLOCKED";
   message?: string;
 }
 
