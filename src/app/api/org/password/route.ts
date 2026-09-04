@@ -58,7 +58,16 @@ export async function PATCH(req: Request) {
   }
 
   const hashed = await bcrypt.hash(newPassword, 12);
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: hashed } });
+  // 비밀번호를 바꾸면 기존에 발급된 JWT 를 전부 무효화한다(tokenVersion +1).
+  // 초기 비밀번호 강제 변경 플래그도 함께 해제한다.
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash: hashed,
+      passwordChangeRequired: false,
+      tokenVersion: { increment: 1 },
+    },
+  });
 
   await writeAuditLog({
     userId: user.id,
@@ -69,7 +78,8 @@ export async function PATCH(req: Request) {
     ipAddress: getClientIp(req.headers),
   });
 
-  return Response.json({ ok: true });
+  // 기존 토큰이 무효화되었으므로 클라이언트는 재로그인해야 한다.
+  return Response.json({ ok: true, reauthRequired: true });
 }
 
 /**

@@ -3,9 +3,15 @@
  *
  * 실행:  npm run db:init-admin
  *
+ * ★ 비밀번호는 저장소에 두지 않습니다. 실행할 때 환경변수로 주입하세요.
+ *     Windows(cmd) : set ADMIN_INITIAL_PASSWORD=... && set ORG_ADMIN_INITIAL_PASSWORD=... && npm run db:init-admin
+ *     PowerShell   : $env:ADMIN_INITIAL_PASSWORD="..."; $env:ORG_ADMIN_INITIAL_PASSWORD="..."; npm run db:init-admin
+ *     bash         : ADMIN_INITIAL_PASSWORD=... ORG_ADMIN_INITIAL_PASSWORD=... npm run db:init-admin
+ *   ORG_ADMIN_INITIAL_PASSWORD 를 생략하면 ADMIN_INITIAL_PASSWORD 를 함께 씁니다.
+ *
  * 아래 두 계정을 항상 "로그인 가능한 상태"로 만들어 줍니다. (여러 번 실행해도 안전)
- *   - 최고관리자(SUPER_ADMIN) : admin@onjung.kr    / admin1234
- *   - 기관관리자(ORG_ADMIN)   : manager1@onjung.kr / org1234
+ *   - 최고관리자(SUPER_ADMIN) : admin@onjung.kr
+ *   - 기관관리자(ORG_ADMIN)   : manager1@onjung.kr
  *
  * 하는 일
  *   1) 계정이 없으면 생성, 있으면 비밀번호를 다시 설정
@@ -20,15 +26,25 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+/** 초기 비밀번호는 환경변수로만 받는다 (평문 커밋 금지) */
+function requirePassword(name: string, fallbackName?: string): string {
+  const pw = (process.env[name] ?? (fallbackName ? process.env[fallbackName] : undefined))?.trim();
+  if (!pw || pw.length < 8) {
+    throw new Error(
+      `환경변수 ${name}${fallbackName ? ` (또는 ${fallbackName})` : ""} 가 없거나 8자 미만입니다.\n` +
+        `  예) set ${name}=원하는비밀번호 && npm run db:init-admin`
+    );
+  }
+  return pw;
+}
+
 const SUPER_ADMIN = {
   email: "admin@onjung.kr",
-  password: "admin1234",
   name: "나눔플러스 최고관리자",
 };
 
 const ORG_ADMIN = {
   email: "manager1@onjung.kr",
-  password: "org1234",
   name: "김복지",
 };
 
@@ -48,25 +64,30 @@ const DEFAULT_ORG = {
 async function main() {
   console.log("🔑 테스트 관리자 계정 초기화 시작...\n");
 
+  const superAdminPassword = requirePassword("ADMIN_INITIAL_PASSWORD");
+  const orgAdminPassword = requirePassword("ORG_ADMIN_INITIAL_PASSWORD", "ADMIN_INITIAL_PASSWORD");
+
   // ─────────────── 1. 최고관리자 ───────────────
   const superAdmin = await prisma.user.upsert({
     where: { email: SUPER_ADMIN.email },
     update: {
       // 로그인 불가 원인(잘못된 비밀번호 / 비활성 / 소프트삭제 / 잘못된 권한)을 모두 복구
-      passwordHash: await bcrypt.hash(SUPER_ADMIN.password, 12),
+      passwordHash: await bcrypt.hash(superAdminPassword, 12),
       role: "SUPER_ADMIN",
       isActive: true,
       deletedAt: null,
+      // 비밀번호를 새로 심었으므로 기존 발급 토큰은 무효화
+      tokenVersion: { increment: 1 },
     },
     create: {
       email: SUPER_ADMIN.email,
       name: SUPER_ADMIN.name,
-      passwordHash: await bcrypt.hash(SUPER_ADMIN.password, 12),
+      passwordHash: await bcrypt.hash(superAdminPassword, 12),
       role: "SUPER_ADMIN",
       isActive: true,
     },
   });
-  console.log(`✅ 최고관리자 : ${superAdmin.email} / ${SUPER_ADMIN.password}`);
+  console.log(`✅ 최고관리자 : ${superAdmin.email} / (ADMIN_INITIAL_PASSWORD 값)`);
 
   // ─────────────── 2. 기관관리자가 소속될 기관 ───────────────
   const org = await prisma.organization.upsert({
@@ -89,17 +110,21 @@ async function main() {
   const orgAdmin = await prisma.user.upsert({
     where: { email: ORG_ADMIN.email },
     update: {
-      passwordHash: await bcrypt.hash(ORG_ADMIN.password, 12),
+      passwordHash: await bcrypt.hash(orgAdminPassword, 12),
       role: "ORG_ADMIN",
       isActive: true,
       deletedAt: null,
+      // 관리자가 심어준 초기 비밀번호 → 첫 로그인 후 본인이 변경하도록 강제
+      passwordChangeRequired: true,
+      tokenVersion: { increment: 1 },
     },
     create: {
       email: ORG_ADMIN.email,
       name: ORG_ADMIN.name,
-      passwordHash: await bcrypt.hash(ORG_ADMIN.password, 12),
+      passwordHash: await bcrypt.hash(orgAdminPassword, 12),
       role: "ORG_ADMIN",
       isActive: true,
+      passwordChangeRequired: true,
     },
   });
 
@@ -109,7 +134,10 @@ async function main() {
     update: { organizationId: org.id },
     create: { userId: orgAdmin.id, organizationId: org.id },
   });
-  console.log(`✅ 기관관리자 : ${orgAdmin.email} / ${ORG_ADMIN.password}  (소속: ${org.name})`);
+  console.log(
+    `✅ 기관관리자 : ${orgAdmin.email} / (ORG_ADMIN_INITIAL_PASSWORD 값)  (소속: ${org.name})` +
+      "\n   → 첫 로그인 후 비밀번호 변경이 강제됩니다."
+  );
 
   // ─────────────── 4. 현재 최고관리자 목록 출력 ───────────────
   const supers = await prisma.user.findMany({

@@ -2,8 +2,12 @@
  * 기관관리자 계정의 비밀번호가 '일괄 기본값'인지 점검한다.
  * 비밀번호는 bcrypt 해시라 값 자체는 못 읽지만, 후보 비밀번호로 대조는 가능하다.
  *
+ * ★ 후보 비밀번호를 코드에 적어두지 않는다. 환경변수로 주입한다.
+ *   PASSWORD_CANDIDATES="후보1,후보2,후보3" npx tsx prisma/check-passwords.ts
+ *   (Windows) set PASSWORD_CANDIDATES=후보1,후보2 && npx tsx prisma/check-passwords.ts
+ *
  * 실행: npx tsx prisma/check-passwords.ts
- * 결과: 콘솔 출력 + prisma/password-check.txt 저장
+ * 결과: 콘솔 출력 + prisma/password-check.txt 저장 (후보 평문은 파일에 남기지 않음)
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -11,8 +15,22 @@ import { writeFileSync } from "fs";
 
 const prisma = new PrismaClient();
 
-// 확인할 후보 비밀번호 (일괄 적용 이력)
-const CANDIDATES = ["12345678", "123456", "org1234"];
+// 확인할 후보 비밀번호 — 환경변수로만 받는다 (평문 커밋 금지)
+const CANDIDATES = (process.env.PASSWORD_CANDIDATES ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+if (CANDIDATES.length === 0) {
+  console.error(
+    "환경변수 PASSWORD_CANDIDATES 가 비어 있습니다.\n" +
+      '  예) set PASSWORD_CANDIDATES=후보1,후보2 && npx tsx prisma/check-passwords.ts'
+  );
+  process.exit(1);
+}
+
+/** 결과 파일/로그에 평문을 남기지 않기 위한 표기 */
+const label = (i: number) => `후보#${i + 1}`;
 
 async function main() {
   const admins = await prisma.organizationAdmin.findMany({
@@ -42,11 +60,11 @@ async function main() {
   const lines: string[] = [];
   lines.push(`기관관리자 계정 수: ${admins.length}`);
   lines.push("");
-  for (const c of CANDIDATES) {
-    lines.push(`■ 기본값 "${c}" 그대로 사용 중 (미변경): ${buckets[c].length}곳`);
+  CANDIDATES.forEach((c, i) => {
+    lines.push(`■ ${label(i)} 그대로 사용 중 (미변경): ${buckets[c].length}곳`);
     for (const l of buckets[c]) lines.push(`   - ${l}`);
     lines.push("");
-  }
+  });
   lines.push(`■ 직접 변경함 (후보와 불일치): ${changed.length}곳`);
   for (const l of changed) lines.push(`   - ${l}`);
   if (noHash.length) {

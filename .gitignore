@@ -55,5 +55,8 @@ emma-mo-keys-*.csv
 # 커밋 메시지 임시파일
 .commitmsg
 
+# 타입 체크용 임시 Prisma 스키마 (삭제해도 무관)
+prisma/.tmp-*.prisma
+
 # 기관 계정 목록(개인정보 가능) - 원격 제외
 나눔플러스_기관계정목록.xlsx

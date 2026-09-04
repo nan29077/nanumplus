@@ -29,9 +29,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!orgAdmin) return Response.json({ error: "기관 관리자 계정이 없습니다." }, { status: 404 });
 
   const hashed = await bcrypt.hash(parsed.data.newPassword, 12);
+  // 초기화된 비밀번호는 최고관리자가 정한 임시 값이므로
+  //  - 해당 계정의 기존 JWT 를 전부 무효화하고(tokenVersion +1)
+  //  - 다음 로그인 시 본인이 비밀번호를 바꾸도록 강제한다.
   await prisma.user.update({
     where: { id: orgAdmin.id },
-    data: { passwordHash: hashed },
+    data: {
+      passwordHash: hashed,
+      tokenVersion: { increment: 1 },
+      passwordChangeRequired: true,
+    },
   });
 
   await writeAuditLog({

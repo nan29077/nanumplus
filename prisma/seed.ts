@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { PrismaClient, type DonationChannel, type DonationStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import QRCode from "qrcode";
@@ -5,6 +6,21 @@ import QRCode from "qrcode";
 const prisma = new PrismaClient();
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
+
+/**
+ * 데모 계정 비밀번호.
+ * ★ 평문 상수를 저장소에 두지 않는다. 환경변수로 주입하거나,
+ *   미설정이면 실행할 때마다 임의 생성해서 마지막에 1회만 출력한다.
+ *     SEED_ADMIN_PASSWORD / SEED_ORG_PASSWORD
+ */
+function seedPassword(envName: string): { value: string; generated: boolean } {
+  const v = process.env[envName]?.trim();
+  if (v && v.length >= 8) return { value: v, generated: false };
+  return { value: randomBytes(9).toString("base64url"), generated: true };
+}
+
+const SEED_ADMIN_PW = seedPassword("SEED_ADMIN_PASSWORD");
+const SEED_ORG_PW = seedPassword("SEED_ORG_PASSWORD");
 
 /** QR 코드 data URL 생성 */
 function makeQr(slug: string) {
@@ -83,11 +99,11 @@ async function main() {
     create: {
       name: "나눔플러스 최고관리자",
       email: "admin@onjung.kr",
-      passwordHash: await bcrypt.hash("admin1234", 12),
+      passwordHash: await bcrypt.hash(SEED_ADMIN_PW.value, 12),
       role: "SUPER_ADMIN",
     },
   });
-  console.log("✅ 최고 관리자: admin@onjung.kr / admin1234");
+  console.log("✅ 최고 관리자: admin@onjung.kr");
 
   // ─────────────────────────── 기관 6개 ───────────────────────────
   const orgDefs = [
@@ -160,7 +176,7 @@ async function main() {
       update: {},
       create: {
         name: def.admin.name, email: def.admin.email,
-        passwordHash: await bcrypt.hash("org1234", 12), role: "ORG_ADMIN",
+        passwordHash: await bcrypt.hash(SEED_ORG_PW.value, 12), role: "ORG_ADMIN",
       },
     });
 
@@ -199,7 +215,7 @@ async function main() {
     }
 
     orgs.push(org);
-    console.log(`✅ 기관: ${def.name} (#2540-${def.smsCode}) · ${def.admin.email} / org1234`);
+    console.log(`✅ 기관: ${def.name} (#2540-${def.smsCode}) · ${def.admin.email}`);
   }
 
   // ─────────────────────────── 캠페인 12개 + 이미지 ───────────────────────────
@@ -619,15 +635,24 @@ async function main() {
 
   console.log("\n✅ 시드 완료! (기존 데이터 유지됨)");
   console.log("═══════════════════════════════════════════════════");
-  console.log("최고 관리자  : admin@onjung.kr / admin1234");
+  console.log("최고 관리자  : admin@onjung.kr");
+  console.log(
+    SEED_ADMIN_PW.generated
+      ? `             비밀번호(자동생성, 지금 저장하세요): ${SEED_ADMIN_PW.value}`
+      : "             비밀번호: 환경변수 SEED_ADMIN_PASSWORD 값"
+  );
   console.log("───────────────────────────────────────────────────");
-  console.log("기관 관리자  : manager1@onjung.kr / org1234  (따뜻한손길복지재단)");
-  console.log("             manager2@onjung.kr / org1234  (푸른희망아동센터)");
-  console.log("             manager3@onjung.kr / org1234  (한울타리노인복지회)");
-  console.log("             manager4@onjung.kr / org1234  (빛나는미래장애인센터)");
-  console.log("             manager5@onjung.kr / org1234  (새벽이슬청소년쉼터)");
-  console.log("             manager6@onjung.kr / org1234  (행복나눔다문화센터)");
+  console.log("기관 관리자  : manager1~6@onjung.kr");
+  console.log(
+    SEED_ORG_PW.generated
+      ? `             비밀번호(자동생성, 지금 저장하세요): ${SEED_ORG_PW.value}`
+      : "             비밀번호: 환경변수 SEED_ORG_PASSWORD 값"
+  );
+  console.log("             manager1 따뜻한손길복지재단 / manager2 푸른희망아동센터");
+  console.log("             manager3 한울타리노인복지회 / manager4 빛나는미래장애인센터");
+  console.log("             manager5 새벽이슬청소년쉼터 / manager6 행복나눔다문화센터");
   console.log("═══════════════════════════════════════════════════");
+  console.log("※ 기존 계정이 이미 있으면 upsert update 가 비어 있어 비밀번호는 바뀌지 않습니다.");
   console.log("QR코드 → /donate/[slug] 후원 페이지로 연결됩니다.");
 }
 

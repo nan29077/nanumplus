@@ -18,7 +18,7 @@ echo.
 echo [2/2] 프로덕션 서버 시작...
 echo.
 echo   http://localhost:3005
-echo   관리자: admin@onjung.kr / admin1234
+echo   관리자 계정: admin@onjung.kr (비밀번호는 db:init-admin 실행 시 지정)
 echo.
 call npx.cmd next start -p 3005
 set "START_EXIT_CODE=%ERRORLEVEL%"

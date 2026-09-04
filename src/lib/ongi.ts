@@ -9,8 +9,22 @@ export function ongiIsLive(): boolean {
   return process.env.ONGI_PROVIDER === "live";
 }
 
+/**
+ * 콜백 ref 서명 시크릿.
+ *
+ * 이전에는 `"dev-secret"` 폴백이 있어, 환경변수를 빠뜨린 채 배포하면
+ * 공개된 상수로 서명이 만들어져 누구나 위조 콜백으로 후원을 COMPLETED 처리할 수 있었다.
+ * 폴백을 제거하고, 값이 없으면 예외를 던져 기동/요청을 실패시킨다.
+ * (필수 환경변수 검증은 src/lib/env.ts + src/instrumentation.ts 에서 기동 시 수행한다.)
+ */
 function refSecret(): string {
-  return process.env.ONGI_CALLBACK_SECRET || process.env.NEXTAUTH_SECRET || "dev-secret";
+  const secret = process.env.ONGI_CALLBACK_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim();
+  if (!secret) {
+    throw new Error(
+      "[ongi] ONGI_CALLBACK_SECRET (또는 NEXTAUTH_SECRET) 이 설정되지 않았습니다. 콜백 서명을 만들 수 없습니다."
+    );
+  }
+  return secret;
 }
 
 export function signRef(ref: string): string {
@@ -19,7 +33,13 @@ export function signRef(ref: string): string {
 
 export function verifyRef(ref: string, sig: string | null): boolean {
   if (!ref || !sig) return false;
-  const expected = signRef(ref);
+  let expected: string;
+  try {
+    expected = signRef(ref);
+  } catch {
+    // 시크릿 미설정 → 어떤 콜백도 신뢰하지 않는다.
+    return false;
+  }
   const a = Buffer.from(expected);
   const b = Buffer.from(sig);
   if (a.length !== b.length) return false;

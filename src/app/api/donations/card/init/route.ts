@@ -7,6 +7,7 @@ import { getClientIp, cardInitSchema } from "@/lib/validation";
 import { getDonorSession } from "@/lib/donor-auth";
 import { checkDonationPolicy } from "@/lib/channel-policy";
 import { findOrCreateDonor } from "@/lib/donor";
+import { blockMockDonation } from "@/lib/payment-guard";
 
 /**
  * 신용카드 정기후원 신청 (핵토 빌링키).
@@ -21,6 +22,10 @@ export async function POST(req: Request) {
   if (!rateLimit(`card-init:${ip}`, 20, 60_000) || !rateLimit("card-init:all", 300, 60_000)) {
     return Response.json({ error: "요청이 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
+
+  // 인증 없는 공개 API 이므로, mock 빌링 어댑터가 즉시 COMPLETED 후원을 만들지 못하게 차단
+  const blocked = blockMockDonation(process.env.HECTO_BILLING_PROVIDER === "live");
+  if (blocked) return blocked;
 
   let body: unknown;
   try {

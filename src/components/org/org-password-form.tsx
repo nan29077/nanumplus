@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signOut } from "next-auth/react";
 import { KeyRound, Loader2, Check } from "lucide-react";
 
 const field = "mt-1.5 w-full rounded-xl border border-stone-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500";
@@ -38,6 +39,11 @@ export function OrgPasswordForm() {
       setCurrent("");
       setNext("");
       setConfirm("");
+      // 비밀번호를 바꾸면 서버가 기존 토큰을 무효화하므로(tokenVersion +1)
+      // 현재 세션으로는 더 이상 요청할 수 없다. 새 비밀번호로 다시 로그인시킨다.
+      setTimeout(() => {
+        void signOut({ callbackUrl: "/login?pwchanged=1" });
+      }, 1200);
     } catch {
       setError("네트워크 오류로 변경에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
@@ -80,7 +86,7 @@ export function OrgPasswordForm() {
           {busy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} /> : <KeyRound className="h-4 w-4" strokeWidth={1.75} />}
           비밀번호 변경
         </button>
-        {done && <span className="flex items-center gap-1 text-sm text-brand-600"><Check className="h-4 w-4" strokeWidth={1.75} /> 변경되었습니다</span>}
+        {done && <span className="flex items-center gap-1 text-sm text-brand-600"><Check className="h-4 w-4" strokeWidth={1.75} /> 변경되었습니다. 새 비밀번호로 다시 로그인해 주세요.</span>}
       </div>
     </form>
   );

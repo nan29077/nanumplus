@@ -106,13 +106,6 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  /// 발급된 JWT 무효화용 버전 카운터.
-  /// 로그아웃·비밀번호 변경·비밀번호 초기화 시 +1 하면 기존 토큰이 전부 무효가 된다.
-  tokenVersion   Int       @default(0)
-
-  /// 초기 비밀번호(일괄 발급) 상태. true 면 로그인 후 비밀번호 변경 화면으로 강제 이동.
-  passwordChangeRequired Boolean @default(false)
-
   organizationAdmin OrganizationAdmin?
   auditLogs         AuditLog[]
   accounts          Account[]
@@ -137,11 +130,6 @@ model Organization {
   bankAccount   String?   // 계좌번호
   bankHolder    String?   // 예금주
   isActive      Boolean   @default(true)
-  // 감사 문자(MT) 발송 스위치 — 기관별 on/off. 기본값 false(꺼짐).
-  // 실제 발송 여부는 PlatformSetting 의 전역 마스터와 AND 로 판단한다.
-  smsMtEnabled   Boolean  @default(false)
-  // 기관 전용 MT 발신번호. 미설정이면 전역 기본 발신번호를 사용한다.
-  mtSenderNumber String?
   deletedAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -345,17 +333,6 @@ model WebhookEvent {
   createdAt   DateTime  @default(now())
 
   @@index([provider, createdAt])
-}
-
-/// 플랫폼 전역 설정 (key-value).
-/// 재배포 없이 최고관리자 화면에서 바꿔야 하는 값만 둔다.
-/// 사용 키는 src/lib/messaging.ts 의 PLATFORM_SETTING_KEYS 참고.
-model PlatformSetting {
-  key         String   @id
-  value       String
-  updatedById String?
-  updatedAt   DateTime @updatedAt
-  createdAt   DateTime @default(now())
 }
 
 model AuditLog {

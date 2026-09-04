@@ -53,7 +53,7 @@ try {
         throw "3005 포트를 이미 다른 프로그램이 사용 중입니다. 기존 나눔플러스 서버 창을 닫고 다시 실행해 주세요."
     }
 
-    Write-Host "  관리자: admin@onjung.kr / admin1234"
+    Write-Host "  관리자 계정: admin@onjung.kr (비밀번호는 db:init-admin 실행 시 지정)"
     Write-Host ""
     Write-Section "========================================="
     Write-Section "  서버를 중지하려면 Ctrl+C 를 누르세요."

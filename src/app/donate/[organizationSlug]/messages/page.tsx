@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { resolveDonationPage } from "@/lib/donation-page";
 import { getDonorSession } from "@/lib/donor-auth";
+import { maskPhone } from "@/lib/masking";
 import { DonateShell } from "@/components/donation/donate-shell";
 import { SmsMessagesClient } from "@/components/donation/sms-messages-client";
 
@@ -27,7 +28,11 @@ export default async function SmsMessagesPage({ params }: { params: { organizati
   }).catch(() => []);
 
   const rows = feed.map((d) => ({
-    id: d.id, smsBody: d.smsBody, senderPhone: d.senderPhone,
+    id: d.id,
+    smsBody: d.smsBody,
+    // 로그인 없이 볼 수 있는 공개 페이지다. 화면에서만 마스킹하면 원문이 RSC 페이로드에
+    // 그대로 실려 브라우저로 내려간다. 서버에서 마스킹한 값만 클라이언트로 넘긴다.
+    senderPhone: d.senderPhone ? maskPhone(d.senderPhone) : null,
     donatedAt: d.donatedAt.toISOString(), amount: d.amount, status: d.status,
   }));
 

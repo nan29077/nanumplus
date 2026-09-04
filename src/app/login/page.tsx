@@ -29,8 +29,11 @@ export default function LoginPage() {
   useEffect(() => {
     if (status !== "authenticated") return;
     const u = session?.user as { role?: string; organizationId?: string | null } | undefined;
+    // 무효화된 토큰(비밀번호 변경·로그아웃·계정 비활성)은 세션에 user 가 없다.
+    // 이 경우 리다이렉트하지 않고 로그인 폼을 그대로 보여준다.
+    if (!u) return;
 
-    if (u?.role === "SUPER_ADMIN") {
+    if (u.role === "SUPER_ADMIN") {
       router.replace("/admin/dashboard");
       return;
     }

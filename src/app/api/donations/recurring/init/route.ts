@@ -7,6 +7,7 @@ import { getClientIp, recurringInitSchema } from "@/lib/validation";
 import { getDonorSession } from "@/lib/donor-auth";
 import { checkDonationPolicy } from "@/lib/channel-policy";
 import { findOrCreateDonor } from "@/lib/donor";
+import { blockMockDonation } from "@/lib/payment-guard";
 
 /**
  * 온기 정기 계좌후원 신청.
@@ -18,6 +19,10 @@ export async function POST(req: Request) {
   if (!rateLimit(`recurring-init:${ip}`, 20, 60_000) || !rateLimit("recurring-init:all", 300, 60_000)) {
     return Response.json({ error: "요청이 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
+
+  // 인증 없는 공개 API 이므로, mock 어댑터가 즉시 COMPLETED 후원을 만들지 못하게 차단
+  const blocked = blockMockDonation(process.env.HECTO_TRANSFER_PROVIDER === "live");
+  if (blocked) return blocked;
 
   let body: unknown;
   try {

@@ -1,0 +1,120 @@
+EMMA MT 점검 — 2026-09-03T05:09:11.469Z
+DB: postgresql://***@localhost:5432/nanumplus
+EMMA_ID(.env) = "nanum"  → 코드가 넣는 값: "na"
+INFOBANK_PROVIDER = live
+INFOBANK_MT_SENDER_NUMBER = 07041582540
+
+============================================================
+[CONN] DB 접속 테스트
+============================================================
+[CONN ERROR] name=PrismaClientInitializationError code=undefined
+Invalid `prisma.$queryRawUnsafe()` invocation:
+
+
+Authentication failed against database server at `localhost`, the provided database credentials for `(not available)` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+
+>>> 접속 자체가 실패했습니다. 아래 쿼리 결과는 모두 같은 이유입니다.
+
+============================================================
+[0] 이 DB의 EMMA 테이블 목록
+============================================================
+[ERROR] name=PrismaClientInitializationError code=undefined
+Invalid `prisma.$queryRawUnsafe()` invocation:
+
+
+Authentication failed against database server at `localhost`, the provided database credentials for `(not available)` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+
+============================================================
+[1] MT 발송 큐 테이블 존재? (null 이면 없음)
+============================================================
+[ERROR] name=PrismaClientInitializationError code=undefined
+Invalid `prisma.$queryRawUnsafe()` invocation:
+
+
+Authentication failed against database server at `localhost`, the provided database credentials for `(not available)` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+
+============================================================
+[2] MT 큐 적체 현황 ('1' = 발송 대기)
+============================================================
+[ERROR] name=PrismaClientInitializationError code=undefined
+Invalid `prisma.$queryRawUnsafe()` invocation:
+
+
+Authentication failed against database server at `localhost`, the provided database credentials for `(not available)` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+
+============================================================
+[2b] 큐 최근 10건
+============================================================
+[ERROR] name=PrismaClientInitializationError code=undefined
+Invalid `prisma.$queryRawUnsafe()` invocation:
+
+
+Authentication failed against database server at `localhost`, the provided database credentials for `(not available)` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+
+============================================================
+[3] EMMA가 실제로 쓰는 emma_id — em_mo_log_202609
+============================================================
+[ERROR] name=PrismaClientInitializationError code=undefined
+Invalid `prisma.$queryRawUnsafe()` invocation:
+
+
+Authentication failed against database server at `localhost`, the provided database credentials for `(not available)` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+
+============================================================
+[3b] EMMA가 실제로 쓰는 emma_id — em_mo_log_202608
+============================================================
+[ERROR] name=PrismaClientInitializationError code=undefined
+Invalid `prisma.$queryRawUnsafe()` invocation:
+
+
+Authentication failed against database server at `localhost`, the provided database credentials for `(not available)` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+
+============================================================
+[4] MT 실제 발송 이력 — em_smt_log_202609 / 202608
+============================================================
+[ERROR] name=PrismaClientInitializationError code=undefined
+Invalid `prisma.$queryRawUnsafe()` invocation:
+
+
+Authentication failed against database server at `localhost`, the provided database credentials for `(not available)` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+
+============================================================
+[4b] em_smt_log_202608
+============================================================
+[ERROR] name=PrismaClientInitializationError code=undefined
+Invalid `prisma.$queryRawUnsafe()` invocation:
+
+
+Authentication failed against database server at `localhost`, the provided database credentials for `(not available)` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+
+============================================================
+[5] 서버 내 DB 목록
+============================================================
+[ERROR] name=PrismaClientInitializationError code=undefined
+Invalid `prisma.$queryRawUnsafe()` invocation:
+
+
+Authentication failed against database server at `localhost`, the provided database credentials for `(not available)` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+
+============================================================
+DONE

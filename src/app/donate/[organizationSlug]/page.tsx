@@ -13,6 +13,7 @@ import { Faq } from "@/components/donation/faq";
 import { getOrganizationAvatar } from "@/lib/organization-avatar";
 import { getDefaultDonationBanner, LINK_TYPE_BUTTON_LABELS, resolveDonationPage, type LinkButtonType } from "@/lib/donation-page";
 import { getDonorSession } from "@/lib/donor-auth";
+import { maskPhone } from "@/lib/masking";
 import { DonateShell } from "@/components/donation/donate-shell";
 import { AutoFitText } from "@/components/donation/auto-fit-text";
 
@@ -255,7 +256,9 @@ export default async function DonatePage({ params, searchParams }: { params: { o
             </Link>
           </div>
           <SmsDonationGrid rows={smsFeed.map((d) => ({
-            id: d.id, smsBody: d.smsBody, senderPhone: d.senderPhone,
+            id: d.id, smsBody: d.smsBody,
+            // 공개 페이지 — 원문 번호가 RSC 페이로드로 노출되지 않도록 서버에서 마스킹
+            senderPhone: d.senderPhone ? maskPhone(d.senderPhone) : null,
             donatedAt: d.donatedAt.toISOString(), amount: d.amount, status: d.status,
           }))} />
         </section>

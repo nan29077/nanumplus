@@ -5,6 +5,7 @@ import { sanitizeText } from "@/lib/sanitize";
 import { getClientIp, transferInitSchema } from "@/lib/validation";
 import { getDonorSession } from "@/lib/donor-auth";
 import { ongiIsLive, signRef, buildOngiPaymentUrl, appBaseUrl } from "@/lib/ongi";
+import { blockMockDonation } from "@/lib/payment-guard";
 
 /**
  * 간편 계좌이체 후원 (온기 내통장결제).
@@ -14,9 +15,14 @@ import { ongiIsLive, signRef, buildOngiPaymentUrl, appBaseUrl } from "@/lib/ongi
  */
 export async function POST(req: Request) {
   const ip = getClientIp(req.headers);
-  if (!rateLimit(`transfer-init:${ip}`, 20, 60_000)) {
+  // IP별 제한 + 전역 제한 (X-Forwarded-For 스푸핑 우회 대비)
+  if (!rateLimit(`transfer-init:${ip}`, 20, 60_000) || !rateLimit("transfer-init:all", 300, 60_000)) {
     return Response.json({ error: "요청이 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
+
+  // 인증 없는 공개 API 이므로, mock 모드에서 즉시 COMPLETED 후원이 만들어지지 않도록 차단
+  const blocked = blockMockDonation(ongiIsLive());
+  if (blocked) return blocked;
 
   let body: unknown;
   try { body = await req.json(); } catch { return Response.json({ error: "잘못된 요청입니다." }, { status: 400 }); }

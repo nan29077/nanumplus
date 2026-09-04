@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { clientIpFromHeaders } from "./client-ip";
 
 export const phoneRegex = /^[0-9\-+\s]{8,20}$/;
 
@@ -39,9 +40,7 @@ export const smsInitSchema = z.object({
 });
 
 export function getClientIp(headers: Headers): string {
-  return (
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headers.get("x-real-ip") ||
-    "unknown"
-  );
+  // X-Forwarded-For 는 클라이언트가 앞부분을 위조할 수 있으므로
+  // 신뢰 가능한 마지막 홉만 사용한다. (src/lib/client-ip.ts)
+  return clientIpFromHeaders(headers);
 }

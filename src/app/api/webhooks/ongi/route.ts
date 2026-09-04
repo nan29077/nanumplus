@@ -55,8 +55,23 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, note: "payment not completed" });
   }
 
-  // 금액 검증(불일치는 완료하되 메모로 기록)
-  const amountNote = amt && amt !== donation.amount ? ` (통지금액 ${amt}≠요청 ${donation.amount})` : "";
+  // ── 금액 검증 ──────────────────────────────────────────────────────────────
+  // 이전에는 금액이 달라도 메모만 남기고 COMPLETED 처리했다.
+  // 1원만 결제하고 100만원짜리 후원을 완료 처리할 수 있는 구멍이므로 승인을 차단한다.
+  // (재시도/정상 통지가 다시 올 수 있도록 상태는 PENDING 으로 두고 메모만 남긴다.)
+  if (!Number.isFinite(amt) || amt <= 0 || amt !== donation.amount) {
+    await prisma.donation.update({
+      where: { id: donation.id },
+      data: {
+        memo: `온기 통지 금액 불일치로 승인 보류 (통지 ${Number.isFinite(amt) ? amt : "없음"} ≠ 요청 ${donation.amount})`,
+      },
+    });
+    console.error(
+      `[webhooks/ongi] 금액 불일치 — donationId=${donation.id} 통지=${amt} 요청=${donation.amount}`
+    );
+    // 재시도 폭주를 막기 위해 200 ack (승인은 하지 않음)
+    return Response.json({ ok: true, note: "amount mismatch - not approved" });
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.donation.update({
@@ -64,7 +79,7 @@ export async function POST(req: Request) {
       data: {
         status: "COMPLETED",
         providerTransactionId: paymentCode ?? undefined,
-        memo: `온기 내통장결제 완료${amountNote}`,
+        memo: "온기 내통장결제 완료",
       },
     });
     if (donation.campaignId) {
