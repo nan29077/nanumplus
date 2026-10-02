@@ -107,7 +107,7 @@ export function Sidebar({
           <p className="px-3 pb-2 text-xs text-stone-400">{userName} 님</p>
         )}
         <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={() => signOut({ callbackUrl: "/login?tab=org" })}
           className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-stone-600 hover:bg-stone-50"
         >
           <LogOut className="h-[18px] w-[18px]" strokeWidth={1.75} />

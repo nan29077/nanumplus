@@ -801,7 +801,7 @@ export default async function LandingPage() {
                 </p>
                 <div className="mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
                   <Link
-                    href="/login"
+                    href="/login?tab=org"
                     className="rounded-full bg-[#285d49] px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-[#214d3d]"
                   >
                     기관 로그인

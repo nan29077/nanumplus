@@ -25,6 +25,6 @@ export async function getDonorSession(): Promise<DonorSession | null> {
 /** 후원자 전용 페이지 보호: 비로그인 시 후원자 로그인으로 */
 export async function requireDonor(callbackPath = "/my"): Promise<DonorSession> {
   const donor = await getDonorSession();
-  if (!donor) redirect(`/donor/login?callbackUrl=${encodeURIComponent(callbackPath)}`);
+  if (!donor) redirect(`/login?tab=donor&callbackUrl=${encodeURIComponent(callbackPath)}`);
   return donor;
 }

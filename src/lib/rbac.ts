@@ -21,7 +21,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 /** 페이지용: 최고 관리자 강제 */
 export async function requireSuperAdmin(): Promise<SessionUser> {
   const user = await getSessionUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?tab=org");
   if (user.role !== "SUPER_ADMIN") redirect("/org/dashboard");
   return user;
 }
@@ -38,11 +38,11 @@ async function isOrgUsable(organizationId: string): Promise<boolean> {
 /** 페이지용: 기관 관리자 강제 — 본인 organizationId 반환 */
 export async function requireOrgAdmin(): Promise<SessionUser & { organizationId: string }> {
   const user = await getSessionUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?tab=org");
   if (user.role === "SUPER_ADMIN") redirect("/admin/dashboard");
   // 화이트리스트: ORG_ADMIN 이외(DONOR 등)의 role은 기관 화면에 접근할 수 없다.
-  if (user.role !== "ORG_ADMIN") redirect("/login");
-  if (!user.organizationId) redirect("/login");
+  if (user.role !== "ORG_ADMIN") redirect("/login?tab=org");
+  if (!user.organizationId) redirect("/login?tab=org");
   // 삭제·비활성화된 기관의 관리자는 접근 차단
   if (!(await isOrgUsable(user.organizationId))) redirect("/login?error=org_inactive");
   return user as SessionUser & { organizationId: string };

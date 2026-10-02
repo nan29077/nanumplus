@@ -29,7 +29,7 @@ const slides = [
     title: "당신의 따뜻한 마음,\n꼭 필요한 곳에 닿도록",
     desc: "문자후원부터 간편 계좌이체, 정기후원까지. 나눔의 모든 순간을 쉽고 투명하게 연결합니다.",
     cta: { label: "진행 중인 캠페인", href: "/campaigns" },
-    secondaryCta: { label: "기관 로그인", href: "/login" },
+    secondaryCta: { label: "기관 로그인", href: "/login?tab=org" },
     image: "/images/hero/nanum-heart-hands.jpg",
     overlay: "from-[#2e2118]/95 via-[#49382b]/66 to-[#49382b]/10",
   },

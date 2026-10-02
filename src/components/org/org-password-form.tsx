@@ -42,7 +42,7 @@ export function OrgPasswordForm() {
       // 비밀번호를 바꾸면 서버가 기존 토큰을 무효화하므로(tokenVersion +1)
       // 현재 세션으로는 더 이상 요청할 수 없다. 새 비밀번호로 다시 로그인시킨다.
       setTimeout(() => {
-        void signOut({ callbackUrl: "/login?pwchanged=1" });
+        void signOut({ callbackUrl: "/login?tab=org&pwchanged=1" });
       }, 1200);
     } catch {
       setError("네트워크 오류로 변경에 실패했습니다. 잠시 후 다시 시도해 주세요.");
