@@ -7,12 +7,16 @@ import { PageHeader } from "@/components/layout/page-header";
 import { DonationTable } from "@/components/donation/donation-table";
 import { FilterBar, Pagination } from "@/components/donation/filter-bar";
 import { toDonationRow } from "@/lib/format-donation";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { PeriodSummary } from "@/components/donation/period-summary";
+import { resolveListPeriod } from "@/lib/kst-date";
+import { LIST_PERIOD_PRESETS, donatedAtWhere, completedSummary } from "@/lib/donation-period";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrgDonationsPage({
   searchParams,
-}: { searchParams: { channel?: string; status?: string; page?: string } }) {
+}: { searchParams: { channel?: string; status?: string; page?: string; period?: string; from?: string; to?: string } }) {
   const user = await requireOrgAdmin();
   const page = parsePageParam(searchParams.page);
   const take = 20;
@@ -23,26 +27,33 @@ export default async function OrgDonationsPage({
   const status = parseStatusParam(searchParams.status,
     ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED"] as const);
 
+  const period = resolveListPeriod(searchParams);
   const where: Prisma.DonationWhereInput = {
     organizationId: user.organizationId,
     deletedAt: null,
     ...(channel ? { channel } : {}),
     ...(status ? { status } : {}),
+    ...donatedAtWhere(period),
   };
 
-  const [org, rows, total] = await Promise.all([
+  const [org, rows, total, summary] = await Promise.all([
     prisma.organization.findUnique({ where: { id: user.organizationId }, select: { name: true } }),
     prisma.donation.findMany({
       where, orderBy: [{ donatedAt: "desc" }, { id: "desc" }], skip: (page - 1) * take, take,
       include: { donor: { select: { name: true } }, campaign: { select: { title: true } } },
     }),
     prisma.donation.count({ where }),
+    completedSummary(where),
   ]);
 
   return (
     <OrgLayout userName={user.name} orgName={org?.name ?? "기관"}>
-      <PageHeader title="후원 내역" description={`총 ${total.toLocaleString("ko-KR")}건의 후원 기록`} />
+      <PageHeader title="후원 내역" description="우리 기관으로 들어온 모든 후원 기록입니다." />
+      <div className="mb-3">
+        <DateRangePicker presets={LIST_PERIOD_PRESETS} defaultPeriod="all" />
+      </div>
       <FilterBar />
+      <PeriodSummary label={period.label} total={total} {...summary} />
       <DonationTable rows={rows.map(toDonationRow)} />
       <Pagination total={total} page={page} pageSize={take} />
     </OrgLayout>

@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { requireSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { parsePageParam, parseStatusParam } from "@/lib/utils";
@@ -6,142 +7,80 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Pagination } from "@/components/donation/filter-bar";
 import { SmsDonationGrid, type SmsDonationRow } from "@/components/donation/sms-donation-card";
 import { SmsOrgSelect } from "@/components/admin/sms-org-select";
-import { SMS_DONATION_AMOUNT } from "@/lib/validation";
-import { periodRange } from "@/lib/kst-date";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { resolveListPeriod } from "@/lib/kst-date";
+import {
+  LIST_PERIOD_PRESETS,
+  donatedAtWhere,
+  completedSummary,
+  listHref,
+} from "@/lib/donation-period";
 import { MessageSquare, Building2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-// Prisma 클라이언트가 아직 organizationId: String? 타입을 모르므로
-// 기관배정 없음 필터는 raw SQL로 처리
 const VALID_STATUSES = ["COMPLETED", "FAILED", "PENDING"] as const;
 
-export default async function Page({
-  searchParams,
-}: { searchParams: { orgId?: string; status?: string; page?: string } }) {
+type SP = {
+  orgId?: string;
+  status?: string;
+  page?: string;
+  period?: string;
+  from?: string;
+  to?: string;
+};
+
+export default async function Page({ searchParams }: { searchParams: SP }) {
   const user = await requireSuperAdmin();
   const page = parsePageParam(searchParams.page);
   const take = 18;
 
   const isUnassigned = searchParams.orgId === "__unassigned__";
   const validStatus = parseStatusParam(searchParams.status, VALID_STATUSES) ?? null;
+  const period = resolveListPeriod(searchParams);
 
-  const [orgs, monthTotal] = await Promise.all([
+  // 예전에는 "기관배정 없음"(organizationId = null)을 Prisma 가 다루지 못해
+  // SQL 문자열을 이어 붙이는 우회 코드를 3갈래로 두었다. 스키마에 nullable 이
+  // 반영된 지금은 하나의 조회로 처리한다. (기간 조건을 문자열로 덧붙이지 않기 위함)
+  const where: Prisma.DonationWhereInput = {
+    deletedAt: null,
+    channel: "SMS",
+    ...(isUnassigned
+      ? { organizationId: null }
+      : searchParams.orgId
+        ? { organizationId: searchParams.orgId }
+        : {}),
+    ...(validStatus ? { status: validStatus } : {}),
+    ...donatedAtWhere(period),
+  };
+
+  const [orgs, donations, total, summary] = await Promise.all([
     prisma.organization.findMany({
       where: { deletedAt: null },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
-    prisma.donation.count({
-      where: {
-        deletedAt: null,
-        channel: "SMS",
-        status: "COMPLETED",
-        donatedAt: {
-          gte: periodRange("thisMonth").from, // KST 기준 이번 달 시작
-        },
-      },
+    prisma.donation.findMany({
+      where,
+      orderBy: [{ donatedAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * take,
+      take,
+      include: { organization: { select: { name: true } } },
     }),
+    prisma.donation.count({ where }),
+    completedSummary(where),
   ]);
 
-  let rows: SmsDonationRow[];
-  let total: number;
-
-  if (isUnassigned) {
-    // organizationId IS NULL — Prisma ORM 타입 제한 우회
-    const statusClause = validStatus
-      ? `AND status = '${validStatus}'::"DonationStatus"`
-      : "";
-    const [rawRows, countResult] = await Promise.all([
-      prisma.$queryRawUnsafe<any[]>(
-        `SELECT id, "smsBody", "senderPhone", "donatedAt",
-                amount::float8 AS amount, status::text AS status, "recipientNumber"
-         FROM "Donation"
-         WHERE "deletedAt" IS NULL AND channel = 'SMS'::"DonationChannel" AND "organizationId" IS NULL ${statusClause}
-         ORDER BY "donatedAt" DESC
-         LIMIT $1 OFFSET $2`,
-        take,
-        (page - 1) * take
-      ),
-      prisma.$queryRawUnsafe<[{ count: bigint }]>(
-        `SELECT COUNT(*) AS count FROM "Donation"
-         WHERE "deletedAt" IS NULL AND channel = 'SMS'::"DonationChannel" AND "organizationId" IS NULL ${statusClause}`
-      ),
-    ]);
-    rows = rawRows.map((d) => ({
-      id: d.id,
-      smsBody: d.smsBody ?? null,
-      senderPhone: d.senderPhone ?? null,
-      donatedAt: new Date(d.donatedAt).toISOString(),
-      amount: Number(d.amount),
-      status: d.status,
-      orgName: null,
-      recipientNumber: d.recipientNumber ?? null,
-    }));
-    total = Number(countResult[0].count);
-  } else if (searchParams.orgId) {
-    // 특정 기관 필터 — organizationId가 항상 존재하므로 ORM 안전
-    const where = {
-      deletedAt: null,
-      channel: "SMS" as const,
-      organizationId: searchParams.orgId,
-      ...(validStatus ? { status: validStatus } : {}),
-    };
-    const [donations, cnt] = await Promise.all([
-      prisma.donation.findMany({
-        where,
-        orderBy: { donatedAt: "desc" },
-        skip: (page - 1) * take,
-        take,
-        include: { organization: { select: { name: true } } },
-      }),
-      prisma.donation.count({ where }),
-    ]);
-    rows = donations.map((d) => ({
-      id: d.id,
-      smsBody: d.smsBody ?? null,
-      senderPhone: d.senderPhone ?? null,
-      donatedAt: d.donatedAt.toISOString(),
-      amount: Number(d.amount),
-      status: d.status,
-      orgName: d.organization?.name ?? null,
-      recipientNumber: (d as any).recipientNumber ?? null,
-    }));
-    total = cnt;
-  } else {
-    // 필터 없음 — null-org SMS 포함 가능하므로 raw SQL 사용
-    const statusClause = validStatus
-      ? `AND d.status = '${validStatus}'::"DonationStatus"`
-      : "";
-    const [rawRows, countResult] = await Promise.all([
-      prisma.$queryRawUnsafe<any[]>(
-        `SELECT d.id, d."smsBody", d."senderPhone", d."donatedAt",
-                d.amount::float8 AS amount, d.status::text AS status,
-                d."recipientNumber", o.name AS "orgName"
-         FROM "Donation" d
-         LEFT JOIN "Organization" o ON d."organizationId" = o.id
-         WHERE d."deletedAt" IS NULL AND d.channel = 'SMS'::"DonationChannel" ${statusClause}
-         ORDER BY d."donatedAt" DESC LIMIT $1 OFFSET $2`,
-        take,
-        (page - 1) * take
-      ),
-      prisma.$queryRawUnsafe<[{ count: bigint }]>(
-        `SELECT COUNT(*) AS count FROM "Donation" d
-         WHERE d."deletedAt" IS NULL AND d.channel = 'SMS'::"DonationChannel" ${statusClause}`
-      ),
-    ]);
-    rows = rawRows.map((d) => ({
-      id: d.id,
-      smsBody: d.smsBody ?? null,
-      senderPhone: d.senderPhone ?? null,
-      donatedAt: new Date(d.donatedAt).toISOString(),
-      amount: Number(d.amount),
-      status: d.status,
-      orgName: d.orgName ?? null,
-      recipientNumber: d.recipientNumber ?? null,
-    }));
-    total = Number(countResult[0].count);
-  }
+  const rows: SmsDonationRow[] = donations.map((d) => ({
+    id: d.id,
+    smsBody: d.smsBody ?? null,
+    senderPhone: d.senderPhone ?? null,
+    donatedAt: d.donatedAt.toISOString(),
+    amount: d.amount,
+    status: d.status,
+    orgName: d.organization?.name ?? null,
+    recipientNumber: d.recipientNumber ?? null,
+  }));
 
   return (
     <AdminLayout userName={user.name}>
@@ -150,38 +89,43 @@ export default async function Page({
         description="전체 기관 문자후원(#2540) 기록입니다. 건당 3,000원 고정."
       />
 
-      {/* 요약 배지 */}
+      {/* 기간 */}
+      <div className="mb-3">
+        <DateRangePicker presets={LIST_PERIOD_PRESETS} defaultPeriod="all" />
+      </div>
+
+      {/* 요약 배지 — 고른 기관·상태·기간 기준 */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5">
           <MessageSquare className="h-4 w-4 text-sky-600" strokeWidth={1.75} />
           <div>
-            <p className="text-[11px] font-medium text-sky-500">이달 전체 완료 건수</p>
-            <p className="text-lg font-bold text-sky-700">{monthTotal.toLocaleString("ko-KR")}건</p>
+            <p className="text-[11px] font-medium text-sky-500">{period.label} 완료 건수</p>
+            <p className="text-lg font-bold text-sky-700">
+              {summary.completedCount.toLocaleString("ko-KR")}건
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5">
           <div>
-            <p className="text-[11px] font-medium text-sky-500">이달 전체 모금액 (추정)</p>
+            <p className="text-[11px] font-medium text-sky-500">{period.label} 모금액</p>
             <p className="text-lg font-bold text-sky-700">
-              {(monthTotal * SMS_DONATION_AMOUNT).toLocaleString("ko-KR")}원
+              {summary.completedAmount.toLocaleString("ko-KR")}원
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5">
           <Building2 className="h-4 w-4 text-stone-500" strokeWidth={1.75} />
           <div>
-            <p className="text-[11px] font-medium text-stone-500">전체 조회 건수</p>
+            <p className="text-[11px] font-medium text-stone-500">조회 건수</p>
             <p className="text-lg font-bold text-stone-800">{total.toLocaleString("ko-KR")}건</p>
           </div>
         </div>
       </div>
 
-      {/* 필터 행 */}
+      {/* 기관 · 상태 */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        {/* 기관 셀렉트박스 */}
         <SmsOrgSelect orgs={orgs} currentOrgId={searchParams.orgId} />
 
-        {/* 상태 필터 */}
         <div className="flex gap-2 text-sm">
           {[
             { label: "전체", value: "" },
@@ -191,7 +135,7 @@ export default async function Page({
           ].map((f) => (
             <a
               key={f.value}
-              href={`?orgId=${searchParams.orgId ?? ""}&status=${f.value}&page=1`}
+              href={listHref(searchParams, { status: f.value || null })}
               className={`rounded-lg px-3 py-1.5 font-medium transition-colors ${
                 (searchParams.status ?? "") === f.value
                   ? "bg-brand-600 text-white"

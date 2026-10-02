@@ -6,12 +6,16 @@ import { PageHeader } from "@/components/layout/page-header";
 import { DonationTable } from "@/components/donation/donation-table";
 import { FilterBar, Pagination } from "@/components/donation/filter-bar";
 import { fetchAllDonations } from "@/lib/donation-raw-query";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { PeriodSummary } from "@/components/donation/period-summary";
+import { resolveListPeriod } from "@/lib/kst-date";
+import { LIST_PERIOD_PRESETS } from "@/lib/donation-period";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDonationsPage({
   searchParams,
-}: { searchParams: { orgId?: string; channel?: string; status?: string; page?: string } }) {
+}: { searchParams: { orgId?: string; channel?: string; status?: string; page?: string; period?: string; from?: string; to?: string } }) {
   const user = await requireSuperAdmin();
   const page = parsePageParam(searchParams.page);
   const take = 20;
@@ -22,13 +26,16 @@ export default async function AdminDonationsPage({
   const status = parseStatusParam(searchParams.status,
     ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED"] as const);
 
-  const [{ rows, total }, orgs] = await Promise.all([
+  const period = resolveListPeriod(searchParams);
+
+  const [{ rows, total, completedCount, completedAmount }, orgs] = await Promise.all([
     fetchAllDonations(
       searchParams.orgId ?? null,
       channel ?? null,
       status ?? null,
       take,
-      (page - 1) * take
+      (page - 1) * take,
+      period
     ),
     prisma.organization.findMany({
       where: { deletedAt: null },
@@ -39,8 +46,17 @@ export default async function AdminDonationsPage({
 
   return (
     <AdminLayout userName={user.name}>
-      <PageHeader title="전체 후원 내역" description={`총 ${total.toLocaleString("ko-KR")}건의 후원 기록`} />
+      <PageHeader title="전체 후원 내역" description="모든 기관·채널의 후원 기록입니다." />
+      <div className="mb-3">
+        <DateRangePicker presets={LIST_PERIOD_PRESETS} defaultPeriod="all" />
+      </div>
       <FilterBar orgs={orgs.map((o) => ({ value: o.id, label: o.name }))} />
+      <PeriodSummary
+        label={period.label}
+        total={total}
+        completedCount={completedCount}
+        completedAmount={completedAmount}
+      />
       <DonationTable rows={rows} showOrg />
       <Pagination total={total} page={page} pageSize={take} />
     </AdminLayout>

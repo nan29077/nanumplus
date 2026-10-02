@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { requireOrgAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { parsePageParam, parseStatusParam } from "@/lib/utils";
@@ -5,16 +6,28 @@ import { OrgLayout } from "@/components/layout/org-layout";
 import { PageHeader } from "@/components/layout/page-header";
 import { Pagination } from "@/components/donation/filter-bar";
 import { SmsDonationGrid, type SmsDonationRow } from "@/components/donation/sms-donation-card";
-import { SMS_DONATION_AMOUNT } from "@/lib/validation";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { maskPhone } from "@/lib/masking";
-import { periodRange } from "@/lib/kst-date";
+import { resolveListPeriod } from "@/lib/kst-date";
+import {
+  LIST_PERIOD_PRESETS,
+  donatedAtWhere,
+  completedSummary,
+  listHref,
+} from "@/lib/donation-period";
 import { MessageSquare } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page({
-  searchParams,
-}: { searchParams: { status?: string; page?: string } }) {
+type SP = {
+  status?: string;
+  page?: string;
+  period?: string;
+  from?: string;
+  to?: string;
+};
+
+export default async function Page({ searchParams }: { searchParams: SP }) {
   const user = await requireOrgAdmin();
   const page = parsePageParam(searchParams.page);
   const take = 18;
@@ -22,34 +35,29 @@ export default async function Page({
   // status 화이트리스트 검증 — 잘못된 값은 무시하고 전체 조회로 폴백
   const status = parseStatusParam(searchParams.status,
     ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED"] as const);
-  const where = {
+  const period = resolveListPeriod(searchParams);
+
+  const where: Prisma.DonationWhereInput = {
     organizationId: user.organizationId,
     deletedAt: null,
-    channel: "SMS" as const,
+    channel: "SMS",
     ...(status ? { status } : {}),
+    ...donatedAtWhere(period),
   };
 
-  const [org, donations, total, monthTotal] = await Promise.all([
+  const [org, donations, total, summary] = await Promise.all([
     prisma.organization.findUnique({
       where: { id: user.organizationId },
       select: { name: true, smsFullNumber: true },
     }),
     prisma.donation.findMany({
       where,
-      orderBy: { donatedAt: "desc" },
+      orderBy: [{ donatedAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * take,
       take,
     }),
     prisma.donation.count({ where }),
-    prisma.donation.count({
-      where: {
-        ...where,
-        status: "COMPLETED",
-        donatedAt: {
-          gte: periodRange("thisMonth").from, // KST 기준 이번 달 시작
-        },
-      },
-    }),
+    completedSummary(where),
   ]);
 
   const rows: SmsDonationRow[] = donations.map((d) => ({
@@ -69,22 +77,33 @@ export default async function Page({
         description="문자후원(#2540) 채널로 들어온 후원입니다. 건당 3,000원 고정."
       />
 
-      {/* 요약 배지 */}
+      {/* 기간 */}
+      <div className="mb-3">
+        <DateRangePicker presets={LIST_PERIOD_PRESETS} defaultPeriod="all" />
+      </div>
+
+      {/* 요약 배지 — 고른 상태·기간 기준 */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5">
           <MessageSquare className="h-4 w-4 text-sky-600" strokeWidth={1.75} />
           <div>
-            <p className="text-[11px] font-medium text-sky-500">이달 완료 건수</p>
-            <p className="text-lg font-bold text-sky-700">{monthTotal.toLocaleString("ko-KR")}건</p>
+            <p className="text-[11px] font-medium text-sky-500">{period.label} 완료 건수</p>
+            <p className="text-lg font-bold text-sky-700">
+              {summary.completedCount.toLocaleString("ko-KR")}건
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5">
           <div>
-            <p className="text-[11px] font-medium text-sky-500">이달 모금액 (추정)</p>
+            <p className="text-[11px] font-medium text-sky-500">{period.label} 모금액</p>
             <p className="text-lg font-bold text-sky-700">
-              {(monthTotal * SMS_DONATION_AMOUNT).toLocaleString("ko-KR")}원
+              {summary.completedAmount.toLocaleString("ko-KR")}원
             </p>
           </div>
+        </div>
+        <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5">
+          <p className="text-[11px] font-medium text-stone-500">조회 건수</p>
+          <p className="text-lg font-bold text-stone-800">{total.toLocaleString("ko-KR")}건</p>
         </div>
         {org?.smsFullNumber && (
           <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5">
@@ -94,7 +113,7 @@ export default async function Page({
         )}
       </div>
 
-      {/* 상태 필터 */}
+      {/* 상태 */}
       <div className="mb-4 flex gap-2 text-sm">
         {[
           { label: "전체", value: "" },
@@ -104,7 +123,7 @@ export default async function Page({
         ].map((f) => (
           <a
             key={f.value}
-            href={`?status=${f.value}&page=1`}
+            href={listHref(searchParams, { status: f.value || null })}
             className={`rounded-lg px-3 py-1.5 font-medium transition-colors ${
               (searchParams.status ?? "") === f.value
                 ? "bg-brand-600 text-white"

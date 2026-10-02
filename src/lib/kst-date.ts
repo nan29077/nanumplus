@@ -1,6 +1,7 @@
 import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 import {
   startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear,
+  startOfWeek, endOfWeek,
   subDays, subMonths, addDays, eachDayOfInterval,
   type Locale,
 } from "date-fns";
@@ -76,6 +77,88 @@ export function periodRange(
       const from = custom?.from ? new Date(`${custom.from}T00:00:00+09:00`) : kstToUtc(startOfDay(now));
       const to = custom?.to ? new Date(`${custom.to}T23:59:59.999+09:00`) : kstToUtc(endOfDay(now));
       return { from, to, label: "직접 선택" };
+    }
+  }
+}
+
+/* ───────────────────────── 후원 내역 목록용 기간 ─────────────────────────
+ *
+ * 리포트 화면의 periodRange 와 별개로 둔다. 목록은 기본값이 "전체 기간"이고
+ * "이번 주"가 있어야 하는데, periodRange 를 바꾸면 리포트 화면 동작이 달라진다.
+ */
+
+export const LIST_PERIOD_KEYS = [
+  "all", "today", "thisWeek", "thisMonth", "lastMonth", "thisYear", "custom",
+] as const;
+export type ListPeriodKey = (typeof LIST_PERIOD_KEYS)[number];
+
+export type ListPeriod = {
+  key: ListPeriodKey;
+  /** 시작 시각(UTC). null 이면 하한 없음 */
+  from: Date | null;
+  /** 종료 시각(UTC). null 이면 상한 없음 */
+  to: Date | null;
+  label: string;
+};
+
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+/** "YYYY-MM-DD" 가 실제로 존재하는 날짜인지 (2026-02-31 같은 값 거부) */
+function isRealYmd(v: string): boolean {
+  if (!YMD.test(v)) return false;
+  const [y, m, d] = v.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+/**
+ * URL 쿼리(period, from, to)를 목록 조회용 기간으로 바꾼다. 모든 날짜는 KST 기준.
+ *  - 값이 없거나 잘못되면 "전체 기간"
+ *  - 이번 주는 월요일 시작(한국 관례)
+ *  - 직접 선택은 시작/종료 중 하나만 있어도 되고, 순서가 뒤집혀 있으면 바로잡는다
+ */
+export function resolveListPeriod(sp: {
+  period?: string;
+  from?: string;
+  to?: string;
+}): ListPeriod {
+  const ALL: ListPeriod = { key: "all", from: null, to: null, label: "전체 기간" };
+  const raw = sp.period ?? "all";
+  const key = (LIST_PERIOD_KEYS as readonly string[]).includes(raw) ? (raw as ListPeriodKey) : "all";
+  const now = nowKst();
+
+  switch (key) {
+    case "all":
+      return ALL;
+    case "today":
+      return { key, from: kstToUtc(startOfDay(now)), to: kstToUtc(endOfDay(now)), label: "오늘" };
+    case "thisWeek":
+      return {
+        key,
+        from: kstToUtc(startOfWeek(now, { weekStartsOn: 1 })),
+        to: kstToUtc(endOfWeek(now, { weekStartsOn: 1 })),
+        label: "이번 주",
+      };
+    case "thisMonth":
+      return { key, from: kstToUtc(startOfMonth(now)), to: kstToUtc(endOfMonth(now)), label: "이번 달" };
+    case "lastMonth": {
+      const lm = subMonths(now, 1);
+      return { key, from: kstToUtc(startOfMonth(lm)), to: kstToUtc(endOfMonth(lm)), label: "지난 달" };
+    }
+    case "thisYear":
+      return { key, from: kstToUtc(startOfYear(now)), to: kstToUtc(endOfDay(now)), label: "올해" };
+    case "custom": {
+      let f = sp.from && isRealYmd(sp.from) ? sp.from : null;
+      let t = sp.to && isRealYmd(sp.to) ? sp.to : null;
+      if (!f && !t) return ALL;
+      if (f && t && f > t) [f, t] = [t, f];
+      const label = f && t ? (f === t ? f : `${f} ~ ${t}`) : f ? `${f} 이후` : `${t} 이전`;
+      return {
+        key,
+        from: f ? new Date(`${f}T00:00:00+09:00`) : null,
+        to: t ? new Date(`${t}T23:59:59.999+09:00`) : null,
+        label,
+      };
     }
   }
 }

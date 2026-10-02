@@ -5,6 +5,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fmtKst } from "@/lib/kst-date";
+import { toPgUtcTimestamp } from "@/lib/donation-period";
 import type { DonationRow } from "@/components/donation/donation-table";
 
 export async function fetchAllDonations(
@@ -12,8 +13,19 @@ export async function fetchAllDonations(
   channel: string | null,
   status: string | null,
   take: number,
-  skip: number
-): Promise<{ rows: DonationRow[]; total: number }> {
+  skip: number,
+  range: { from: Date | null; to: Date | null } = { from: null, to: null }
+): Promise<{
+  rows: DonationRow[];
+  total: number;
+  /** 같은 조건 안에서 완료 상태만의 건수·금액 */
+  completedCount: number;
+  completedAmount: number;
+}> {
+  // 기간 — UTC 벽시계 문자열을 ::timestamp 로 비교 (lib/donation-period.ts 설명 참조)
+  const fromTs = toPgUtcTimestamp(range.from);
+  const toTs = toPgUtcTimestamp(range.to);
+
   // M-8: LIMIT/OFFSET을 Prisma.sql 템플릿 리터럴로 파라미터 바인딩하여 직접 삽입 제거.
   // take/skip은 서버에서 생성한 숫자값이지만, 파라미터 바인딩으로 통일해 SQL 인젝션 방어를 명확히 한다.
   const [rawRows, countRows] = await Promise.all([
@@ -29,16 +41,22 @@ export async function fetchAllDonations(
         AND (${orgId}::text IS NULL OR d."organizationId" = ${orgId})
         AND (${channel}::text IS NULL OR d.channel = ${channel}::"DonationChannel")
         AND (${status}::text IS NULL OR d.status = ${status}::"DonationStatus")
+        AND (${fromTs}::timestamp IS NULL OR d."donatedAt" >= ${fromTs}::timestamp)
+        AND (${toTs}::timestamp IS NULL OR d."donatedAt" <= ${toTs}::timestamp)
       ORDER BY d."donatedAt" DESC, d.id DESC
       LIMIT ${take} OFFSET ${skip}
     `),
-    prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
-      SELECT COUNT(*) AS count
+    prisma.$queryRaw<{ count: bigint; completed_count: bigint; completed_amount: bigint | null }[]>(Prisma.sql`
+      SELECT COUNT(*) AS count,
+             COUNT(*) FILTER (WHERE d.status = 'COMPLETED') AS completed_count,
+             COALESCE(SUM(d.amount) FILTER (WHERE d.status = 'COMPLETED'), 0) AS completed_amount
       FROM "Donation" d
       WHERE d."deletedAt" IS NULL
         AND (${orgId}::text IS NULL OR d."organizationId" = ${orgId})
         AND (${channel}::text IS NULL OR d.channel = ${channel}::"DonationChannel")
         AND (${status}::text IS NULL OR d.status = ${status}::"DonationStatus")
+        AND (${fromTs}::timestamp IS NULL OR d."donatedAt" >= ${fromTs}::timestamp)
+        AND (${toTs}::timestamp IS NULL OR d."donatedAt" <= ${toTs}::timestamp)
     `),
   ]);
 
@@ -57,5 +75,7 @@ export async function fetchAllDonations(
   return {
     rows,
     total: Number(countRows[0].count),
+    completedCount: Number(countRows[0].completed_count),
+    completedAmount: Number(countRows[0].completed_amount ?? 0),
   };
 }
